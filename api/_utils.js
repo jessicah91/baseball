@@ -1,0 +1,95 @@
+const TEAM_MAP = {
+  LG: { ko: 'LG', color: '#B31F45' },
+  KIA: { ko: 'KIA', color: '#D91F36' },
+  DOOSAN: { ko: '두산', color: '#1B1F48' },
+  SAMSUNG: { ko: '삼성', color: '#006DFF' },
+  LOTTE: { ko: '롯데', color: '#0E2E63' },
+  NC: { ko: 'NC', color: '#315D9A' },
+  KT: { ko: 'KT', color: '#232733' },
+  HANWHA: { ko: '한화', color: '#F36B21' },
+  SSG: { ko: 'SSG', color: '#C01E37' },
+  KIWOOM: { ko: '키움', color: '#6B1830' }
+};
+const TEAM_CODES = Object.keys(TEAM_MAP);
+const TEAM_PATTERN = TEAM_CODES.join('|');
+const KOR_TO_ENG = Object.fromEntries(Object.entries(TEAM_MAP).map(([eng, info]) => [info.ko, eng]));
+Object.assign(KOR_TO_ENG, {
+  '한화 이글스': 'HANWHA', '롯데 자이언츠': 'LOTTE', '삼성 라이온즈': 'SAMSUNG', '두산 베어스': 'DOOSAN',
+  '키움 히어로즈': 'KIWOOM', 'KT 위즈': 'KT', 'KIA 타이거즈': 'KIA', 'SSG 랜더스': 'SSG',
+  'NC 다이노스': 'NC', 'LG 트윈스': 'LG'
+});
+
+function normalizeTeam(input = '') {
+  const trimmed = String(input).trim();
+  if (TEAM_MAP[trimmed]) return trimmed;
+  if (KOR_TO_ENG[trimmed]) return KOR_TO_ENG[trimmed];
+  return 'LG';
+}
+
+function toKoreanTeam(eng) {
+  return TEAM_MAP[eng]?.ko || eng;
+}
+
+function koreaDateString(date = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(date);
+}
+
+function shiftDate(dateString, delta) {
+  const [y, m, d] = dateString.split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  date.setUTCDate(date.getUTCDate() + delta);
+  return date.toISOString().slice(0, 10);
+}
+
+function decodeEntities(text = '') {
+  return text
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"');
+}
+
+function htmlToLines(html = '') {
+  return decodeEntities(
+    html
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
+      .replace(/<[^>]+>/g, '\n')
+  )
+    .split('\n')
+    .map(line => line.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+}
+
+async function fetchHtml(url) {
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0',
+      'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
+    },
+    cache: 'no-store'
+  });
+  if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.status}`);
+  return response.text();
+}
+
+function inferOpponent(game, team) {
+  return game.home === team ? game.away : game.home;
+}
+
+module.exports = {
+  TEAM_MAP,
+  TEAM_CODES,
+  TEAM_PATTERN,
+  KOR_TO_ENG,
+  normalizeTeam,
+  toKoreanTeam,
+  koreaDateString,
+  shiftDate,
+  htmlToLines,
+  fetchHtml,
+  inferOpponent
+};

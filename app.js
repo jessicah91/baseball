@@ -29,63 +29,73 @@ const state = {
   theme: localStorage.getItem('theme') || 'dark',
   recentLimit: Number(localStorage.getItem('recentLimit') || 5) === 10 ? 10 : 5,
   writeMode: 'template',
+  standingsOpen: localStorage.getItem('standingsOpen') === 'true',
+  recentOpen: localStorage.getItem('recentOpen') !== 'false',
+  recordOpen: localStorage.getItem('recordOpen') !== 'false',
   dashboard: null,
   selectedGameId: null,
-  standingsOpen: false,
-  recentOpen: true,
-  recordOpen: true
+  gameDetails: {}
 };
 
 const els = {
-  themeToggle: document.getElementById('themeToggle'),
   heroTeam: document.getElementById('heroTeam'),
+  heroModeLabel: document.getElementById('heroModeLabel'),
+  heroRangeLabel: document.getElementById('heroRangeLabel'),
   teamSelect: document.getElementById('myTeamSelect'),
+  themeToggle: document.getElementById('themeToggle'),
   todayStatus: document.getElementById('todayStatus'),
   todayGameCard: document.getElementById('todayGameCard'),
   myStandingCard: document.getElementById('myStandingCard'),
   standingsTable: document.getElementById('standingsTable'),
   fullStandingsWrap: document.getElementById('fullStandingsWrap'),
   toggleStandingsBtn: document.getElementById('toggleStandingsBtn'),
-  recentGamesList: document.getElementById('recentGamesList'),
   recentCalendar: document.getElementById('recentCalendar'),
   selectedGameDetail: document.getElementById('selectedGameDetail'),
   toggleRecentBtn: document.getElementById('toggleRecentBtn'),
   recentContent: document.getElementById('recentContent'),
   toggleRecordBtn: document.getElementById('toggleRecordBtn'),
   recordContent: document.getElementById('recordContent'),
+  templateFields: document.getElementById('templateFields'),
+  freeFields: document.getElementById('freeFields'),
   softenBtn: document.getElementById('softenBtn'),
   softenResult: document.getElementById('softenResult'),
   softenAlternatives: document.getElementById('softenAlternatives'),
   previewBtn: document.getElementById('previewBtn'),
-  previewResult: document.getElementById('previewResult'),
-  templateFields: document.getElementById('templateFields'),
-  freeFields: document.getElementById('freeFields')
+  previewResult: document.getElementById('previewResult')
 };
 
-function setAccent(color) {
-  const hex = color || TEAM_THEME[state.myTeam] || '#B31F45';
-  document.documentElement.style.setProperty('--accent', hex);
-  const rgb = hex.replace('#', '');
+function setAccent(hex) {
+  const color = hex || TEAM_THEME[state.myTeam] || '#B31F45';
+  const rgb = color.replace('#', '');
   const r = parseInt(rgb.slice(0, 2), 16);
   const g = parseInt(rgb.slice(2, 4), 16);
   const b = parseInt(rgb.slice(4, 6), 16);
+  document.documentElement.style.setProperty('--accent', color);
   document.documentElement.style.setProperty('--accent-rgb', `${r}, ${g}, ${b}`);
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', state.theme === 'dark' ? '#0d1117' : '#f5f7fb');
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', state.theme === 'dark' ? '#0b1017' : '#f4f5f7');
 }
 
 function applyTheme() {
-  document.body.dataset.theme = state.theme === 'dark' ? 'dark' : 'light';
+  document.body.dataset.theme = state.theme;
   els.themeToggle.textContent = state.theme === 'dark' ? '화이트' : '나이트';
+  els.heroModeLabel.textContent = state.theme === 'dark' ? 'NIGHT' : 'DAY';
+  setAccent(TEAM_THEME[state.myTeam]);
 }
 
-function applyTeamAccent() {
+function applyTeam() {
+  const selected = TEAM_OPTIONS.find(item => item.value === state.myTeam);
+  els.heroTeam.textContent = selected ? selected.label.split(' ')[0] : state.myTeam;
   setAccent(TEAM_THEME[state.myTeam]);
-  els.heroTeam.textContent = TEAM_OPTIONS.find(team => team.value === state.myTeam)?.label?.split(' ')[0] || state.myTeam;
 }
 
 function populateTeams() {
   els.teamSelect.innerHTML = TEAM_OPTIONS.map(team => `<option value="${team.value}">${team.label}</option>`).join('');
   els.teamSelect.value = state.myTeam;
+}
+
+function formatDate(dateString) {
+  const date = new Date(`${dateString}T00:00:00+09:00`);
+  return new Intl.DateTimeFormat('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short' }).format(date);
 }
 
 function setWriteMode(mode) {
@@ -100,48 +110,47 @@ function setWriteMode(mode) {
 function setRecentLimit(limit) {
   state.recentLimit = limit === 10 ? 10 : 5;
   localStorage.setItem('recentLimit', String(state.recentLimit));
+  els.heroRangeLabel.textContent = `${state.recentLimit} GAMES`;
   document.querySelectorAll('#recentRangeTabs .segmented-btn').forEach(btn => {
     btn.classList.toggle('active', Number(btn.dataset.limit) === state.recentLimit);
   });
   fetchDashboard();
 }
 
-function formatDate(dateString) {
-  const date = new Date(`${dateString}T00:00:00+09:00`);
-  return new Intl.DateTimeFormat('ko-KR', { month: 'short', day: 'numeric', weekday: 'short' }).format(date);
-}
-
-function calendarDate(dateString) {
-  const date = new Date(`${dateString}T00:00:00+09:00`);
-  return new Intl.DateTimeFormat('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short' }).format(date);
+function setCollapsible(targetEl, buttonEl, open) {
+  targetEl.classList.toggle('open', open);
+  buttonEl.textContent = open ? '▾' : '▸';
+  buttonEl.setAttribute('aria-expanded', String(open));
 }
 
 function renderTodayGame(game) {
   if (!game) {
     els.todayStatus.textContent = '경기 없음';
-    els.todayGameCard.innerHTML = `<p class="muted">오늘은 ${els.heroTeam.textContent} 경기 정보가 아직 없어요.</p>`;
+    els.todayGameCard.classList.remove('loading');
+    els.todayGameCard.innerHTML = `<p class="muted">오늘은 ${els.heroTeam.textContent} 경기 일정이 확인되지 않아요.</p>`;
     return;
   }
 
-  const score = game.isFinal ? `${game.awayScore} : ${game.homeScore}` : 'VS';
-  const status = game.statusLabel || (game.isFinal ? '경기 종료' : '경기 예정');
-  els.todayStatus.textContent = status;
+  const scoreText = game.isFinal ? `${game.awayScore} : ${game.homeScore}` : 'VS';
+  const resultText = game.isFinal ? (game.result || '종료') : '예정 경기';
+  els.todayStatus.textContent = game.statusLabel || (game.isFinal ? '경기 종료' : '경기 예정');
+  els.todayGameCard.classList.remove('loading');
   els.todayGameCard.innerHTML = `
-    <div class="game-top">
+    <div class="game-head">
       <div>
         <p class="eyebrow">${formatDate(game.date)}</p>
         <strong>${game.awayKo} vs ${game.homeKo}</strong>
       </div>
       <span class="pill">${game.stadium || '구장 정보 없음'}</span>
     </div>
-    <div class="matchup-line">
-      <div class="team-mark"><span class="team-dot"></span>${game.awayKo}</div>
-      <div class="score-chip">${score}</div>
-      <div class="team-mark">${game.homeKo}<span class="team-dot"></span></div>
+    <div class="matchup">
+      <div class="team-name"><span class="team-dot"></span>${game.awayKo}</div>
+      <div class="score-box">${scoreText}</div>
+      <div class="team-name" style="justify-self:end">${game.homeKo}<span class="team-dot"></span></div>
     </div>
     <div class="meta-row" style="margin-top:12px">
       <span class="meta-chip">${game.time || '시간 미정'}</span>
-      <span class="meta-chip">${game.isFinal ? (game.result || '종료') : '예정 경기'}</span>
+      <span class="meta-chip">${resultText}</span>
       <span class="meta-chip">상대 ${game.opponentKo || '-'}</span>
     </div>
   `;
@@ -149,13 +158,15 @@ function renderTodayGame(game) {
 
 function renderMyStanding(standing) {
   if (!standing) {
-    els.myStandingCard.innerHTML = `<p class="muted">순위 정보를 아직 가져오지 못했어요.</p>`;
+    els.myStandingCard.classList.remove('loading');
+    els.myStandingCard.innerHTML = '<p class="muted">마이팀 순위 정보를 아직 가져오지 못했어요.</p>';
     return;
   }
+  els.myStandingCard.classList.remove('loading');
   els.myStandingCard.innerHTML = `
     <div class="standing-row mine">
       <div>
-        <div class="team-mark"><span class="rank-badge">${standing.rank}</span>${standing.teamKo}</div>
+        <div class="team-rank"><span class="rank-badge">${standing.rank}</span><strong>${standing.teamKo}</strong></div>
         <div class="standing-meta">${standing.wins}승 ${standing.losses}패 ${standing.draws}무 · 승률 ${standing.pct}</div>
       </div>
       <div class="standing-meta">${standing.streak || ''}</div>
@@ -164,14 +175,14 @@ function renderMyStanding(standing) {
 }
 
 function renderStandings(standings) {
-  if (!standings.length) {
-    els.standingsTable.innerHTML = `<p class="muted">전체 순위 정보를 불러오지 못했어요.</p>`;
+  if (!standings || !standings.length) {
+    els.standingsTable.innerHTML = '<p class="muted">전체 순위 정보를 아직 가져오지 못했어요.</p>';
     return;
   }
   els.standingsTable.innerHTML = standings.map(item => `
     <div class="standing-row ${item.team === state.myTeam ? 'mine' : ''}">
       <div>
-        <div class="team-mark"><span class="rank-badge">${item.rank}</span>${item.teamKo}</div>
+        <div class="team-rank"><span class="rank-badge">${item.rank}</span><strong>${item.teamKo}</strong></div>
         <div class="standing-meta">${item.wins}승 ${item.losses}패 ${item.draws}무</div>
       </div>
       <div class="standing-meta">${item.pct}</div>
@@ -179,78 +190,71 @@ function renderStandings(standings) {
   `).join('');
 }
 
-function getChronologicalGames() {
+function getGamesChronological() {
   const games = [...(state.dashboard?.recentGames || [])];
   return games.sort((a, b) => a.date.localeCompare(b.date));
 }
 
 function renderRecentGames(games) {
-  if (!games.length) {
-    els.recentGamesList.innerHTML = `<p class="muted">최근 경기 데이터를 가져오지 못했어요.</p>`;
-    els.recentCalendar.innerHTML = '';
-    els.selectedGameDetail.textContent = '상세 데이터를 불러오지 못했어요.';
+  if (!games || !games.length) {
+    els.recentCalendar.classList.remove('loading');
+    els.recentCalendar.innerHTML = '<p class="muted">최근 경기 기록을 가져오지 못했어요.</p>';
+    els.selectedGameDetail.textContent = '날짜를 누르면 상세 정보가 보여요.';
     return;
   }
 
   const chronological = [...games].sort((a, b) => a.date.localeCompare(b.date));
-  const listDescending = [...games].sort((a, b) => b.date.localeCompare(a.date));
+  if (!state.selectedGameId || !chronological.some(game => game.id === state.selectedGameId)) {
+    state.selectedGameId = chronological[chronological.length - 1].id;
+  }
 
-  els.recentGamesList.innerHTML = listDescending.map(game => {
-    const cls = game.result === '승' ? 'win' : game.result === '패' ? 'lose' : 'draw';
-    return `
-      <article class="game-card ${state.selectedGameId === game.id ? 'selected' : ''}" data-game-id="${game.id}">
-        <div class="game-top">
-          <div>
-            <p class="eyebrow">${formatDate(game.date)}</p>
-            <strong>${game.homeKo} vs ${game.awayKo}</strong>
-          </div>
-          <span class="result-chip ${cls}">${game.result}</span>
-        </div>
-        <div class="matchup-line">
-          <div class="team-mark"><span class="team-dot"></span>${game.awayKo}</div>
-          <div class="score-chip">${game.awayScore} : ${game.homeScore}</div>
-          <div class="team-mark">${game.homeKo}<span class="team-dot"></span></div>
-        </div>
-        <div class="meta-row" style="margin-top:12px">
-          <span class="meta-chip">${game.stadium || '구장 정보 없음'}</span>
-          <span class="meta-chip">상대 ${game.opponentKo}</span>
-        </div>
-      </article>
-    `;
-  }).join('');
-
+  els.recentCalendar.classList.remove('loading');
   els.recentCalendar.innerHTML = chronological.map(game => {
-    const cls = game.result === '승' ? 'win' : game.result === '패' ? 'lose' : 'draw';
-    const selected = state.selectedGameId === game.id ? 'selected' : '';
+    const resultClass = game.result === '승' ? 'win' : game.result === '패' ? 'lose' : 'draw';
     return `
-      <button class="calendar-day ${selected}" data-game-id="${game.id}">
-        <span class="calendar-date">${calendarDate(game.date)}</span>
-        <span class="calendar-opponent">vs ${game.opponentKo}</span>
-        <span class="calendar-result ${cls}">${game.result} · ${game.myScore}-${game.oppScore}</span>
+      <button class="calendar-day ${state.selectedGameId === game.id ? 'selected' : ''}" data-game-id="${game.id}">
+        <div class="calendar-top">
+          <span class="calendar-date">${formatDate(game.date)}</span>
+          <span class="calendar-result ${resultClass}">${game.result}</span>
+        </div>
+        <strong class="calendar-opponent">vs ${game.opponentKo}</strong>
+        <div class="standing-meta">${game.myTeamKo} ${game.myScore} : ${game.oppScore} ${game.opponentKo}</div>
       </button>
     `;
   }).join('');
 
-  if (!state.selectedGameId) {
-    state.selectedGameId = chronological[chronological.length - 1].id;
-  }
   renderSelectedGame();
 }
 
-function detailValue(value) {
-  return value && String(value).trim() ? value : '정보 없음';
+function detailCell(label, value, wide = false) {
+  return `
+    <div class="detail-item ${wide ? 'wide' : ''}">
+      <span class="detail-label">${label}</span>
+      <span class="detail-value">${value && String(value).trim() ? value : '정보 없음'}</span>
+    </div>
+  `;
 }
 
-function renderSelectedGame() {
+async function renderSelectedGame() {
   const game = (state.dashboard?.recentGames || []).find(item => item.id === state.selectedGameId);
   if (!game) {
-    els.selectedGameDetail.textContent = '날짜를 누르면 경기 상세가 보여요.';
+    els.selectedGameDetail.classList.add('muted');
+    els.selectedGameDetail.textContent = '날짜를 누르면 상세 정보가 보여요.';
     return;
   }
 
+  const cached = state.gameDetails[game.id];
+  const detail = cached || {
+    winningPitcher: game.winningPitcher || null,
+    losingPitcher: game.losingPitcher || null,
+    savePitcher: game.savePitcher || null,
+    holdPitchers: game.holdPitchers || null,
+    decisiveHitter: game.decisiveHitter || null
+  };
+
   els.selectedGameDetail.classList.remove('muted');
   els.selectedGameDetail.innerHTML = `
-    <div class="game-top">
+    <div class="game-head">
       <div>
         <p class="eyebrow">${formatDate(game.date)}</p>
         <strong>${game.scoreLabel}</strong>
@@ -258,49 +262,62 @@ function renderSelectedGame() {
       <span class="pill">${game.stadium || '구장 정보 없음'}</span>
     </div>
     <div class="detail-grid">
-      <div class="detail-item"><span class="detail-label">승리투수</span><span class="detail-value">${detailValue(game.winningPitcher)}</span></div>
-      <div class="detail-item"><span class="detail-label">패전투수</span><span class="detail-value">${detailValue(game.losingPitcher)}</span></div>
-      <div class="detail-item"><span class="detail-label">세이브투수</span><span class="detail-value">${detailValue(game.savePitcher)}</span></div>
-      <div class="detail-item"><span class="detail-label">홀드투수</span><span class="detail-value">${detailValue(game.holdPitchers)}</span></div>
-      <div class="detail-item" style="grid-column:1/-1"><span class="detail-label">결승타 선수</span><span class="detail-value">${detailValue(game.decisiveHitter)}</span></div>
+      ${detailCell('승리투수', detail.winningPitcher)}
+      ${detailCell('패전투수', detail.losingPitcher)}
+      ${detailCell('세이브투수', detail.savePitcher)}
+      ${detailCell('홀드투수', detail.holdPitchers)}
+      ${detailCell('결승타 선수', detail.decisiveHitter, true)}
     </div>
   `;
+
+  if (!cached) {
+    try {
+      const url = `/api/game-detail?date=${encodeURIComponent(game.date)}&away=${encodeURIComponent(game.away)}&home=${encodeURIComponent(game.home)}&awayKo=${encodeURIComponent(game.awayKo)}&homeKo=${encodeURIComponent(game.homeKo)}`;
+      const response = await fetch(url);
+      const extra = await response.json();
+      state.gameDetails[game.id] = {
+        winningPitcher: extra.winningPitcher || detail.winningPitcher,
+        losingPitcher: extra.losingPitcher || detail.losingPitcher,
+        savePitcher: extra.savePitcher || detail.savePitcher,
+        holdPitchers: extra.holdPitchers || detail.holdPitchers,
+        decisiveHitter: extra.decisiveHitter || detail.decisiveHitter
+      };
+      if (state.selectedGameId === game.id) renderSelectedGame();
+    } catch (error) {
+      // keep scoreboard values only
+    }
+  }
 }
 
 function collectRawInput() {
   if (state.writeMode === 'free') {
     return document.getElementById('freeNote').value.trim();
   }
-
-  const parts = [
+  return [
     `감정: ${document.getElementById('feeling').value}`,
     `한 줄 요약: ${document.getElementById('oneLine').value}`,
     `좋았던 장면: ${document.getElementById('goodPoint').value}`,
     `아쉬웠던 장면: ${document.getElementById('badPoint').value}`,
     `다음 경기 기대: ${document.getElementById('nextPoint').value}`
-  ].filter(item => !item.endsWith(': '));
-
-  return parts.join('\n');
+  ].filter(item => !item.endsWith(': ')).join('\n');
 }
 
 function makePreviewText() {
   if (state.writeMode === 'free') {
-    const note = document.getElementById('freeNote').value.trim();
-    return note ? `오늘은 ${els.heroTeam.textContent} 경기를 보며 ${note}` : '';
+    const text = document.getElementById('freeNote').value.trim();
+    return text ? `오늘 ${els.heroTeam.textContent} 경기를 보며 ${text}` : '';
   }
-
   const feeling = document.getElementById('feeling').value.trim();
   const oneLine = document.getElementById('oneLine').value.trim();
   const goodPoint = document.getElementById('goodPoint').value.trim();
   const badPoint = document.getElementById('badPoint').value.trim();
   const nextPoint = document.getElementById('nextPoint').value.trim();
-  const segments = [];
-  if (oneLine) segments.push(oneLine);
-  if (goodPoint) segments.push(`좋았던 장면은 ${goodPoint}`);
-  if (badPoint) segments.push(`아쉬웠던 장면은 ${badPoint}`);
-  if (nextPoint) segments.push(`다음 경기에서는 ${nextPoint}를 기대한다`);
-  if (!segments.length) return '';
-  return `${els.heroTeam.textContent} 팬 기록. 오늘은 ${feeling}. ${segments.join('. ')}.`;
+  const pieces = [];
+  if (oneLine) pieces.push(oneLine);
+  if (goodPoint) pieces.push(`좋았던 장면은 ${goodPoint}`);
+  if (badPoint) pieces.push(`아쉬웠던 장면은 ${badPoint}`);
+  if (nextPoint) pieces.push(`다음 경기에서는 ${nextPoint}를 기대한다`);
+  return pieces.length ? `${els.heroTeam.textContent} 팬 기록. 오늘은 ${feeling}. ${pieces.join('. ')}.` : '';
 }
 
 async function softenText() {
@@ -310,10 +327,8 @@ async function softenText() {
     els.softenAlternatives.innerHTML = '';
     return;
   }
-
   els.softenResult.textContent = '정리 중…';
   els.softenAlternatives.innerHTML = '';
-
   try {
     const response = await fetch('/api/soften', {
       method: 'POST',
@@ -334,31 +349,23 @@ function renderPreview() {
   els.previewResult.textContent = preview || '먼저 기록을 입력해줘.';
 }
 
-function toggleCollapsible(open, wrap, btn) {
-  wrap.classList.toggle('open', open);
-  btn.setAttribute('aria-expanded', String(open));
-  btn.textContent = open ? '▾' : '▸';
-}
-
 async function fetchDashboard() {
   els.todayStatus.textContent = '불러오는 중';
-  els.todayGameCard.innerHTML = '';
-  els.myStandingCard.innerHTML = '';
+  els.todayGameCard.classList.add('loading');
+  els.myStandingCard.classList.add('loading');
+  els.recentCalendar.classList.add('loading');
+  els.todayGameCard.textContent = '오늘 경기 정보를 불러오는 중이에요.';
+  els.myStandingCard.textContent = '순위 정보를 불러오는 중이에요.';
+  els.recentCalendar.textContent = '최근 경기 데이터를 불러오는 중이에요.';
   els.standingsTable.innerHTML = '';
-  els.recentCalendar.innerHTML = '';
-  els.recentGamesList.innerHTML = '';
-  els.selectedGameDetail.textContent = '불러오는 중…';
+  els.selectedGameDetail.textContent = '상세 데이터를 불러오는 중이에요.';
 
   try {
     const response = await fetch(`/api/kbo-dashboard?team=${state.myTeam}&limit=${state.recentLimit}`);
     const data = await response.json();
     state.dashboard = data;
-    if (!state.selectedGameId || !(data.recentGames || []).some(item => item.id === state.selectedGameId)) {
-      const chronological = [...(data.recentGames || [])].sort((a, b) => a.date.localeCompare(b.date));
-      state.selectedGameId = chronological[chronological.length - 1]?.id || null;
-    }
-    renderTodayGame(data.myTodayGame);
-    renderMyStanding(data.myStanding);
+    renderTodayGame(data.myTodayGame || null);
+    renderMyStanding(data.myStanding || null);
     renderStandings(data.standings || []);
     renderRecentGames(data.recentGames || []);
   } catch (error) {
@@ -375,13 +382,13 @@ function bindEvents() {
     state.theme = state.theme === 'dark' ? 'light' : 'dark';
     localStorage.setItem('theme', state.theme);
     applyTheme();
-    setAccent(TEAM_THEME[state.myTeam]);
   });
 
   els.teamSelect.addEventListener('change', (event) => {
     state.myTeam = event.target.value;
     localStorage.setItem('myTeam', state.myTeam);
-    applyTeamAccent();
+    state.gameDetails = {};
+    applyTeam();
     fetchDashboard();
   });
 
@@ -393,41 +400,30 @@ function bindEvents() {
     btn.addEventListener('click', () => setWriteMode(btn.dataset.mode));
   });
 
-  document.querySelectorAll('[data-scroll]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const target = document.getElementById(btn.dataset.scroll);
-      target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  });
-
   els.toggleStandingsBtn.addEventListener('click', () => {
     state.standingsOpen = !state.standingsOpen;
+    localStorage.setItem('standingsOpen', String(state.standingsOpen));
     els.fullStandingsWrap.classList.toggle('collapsed', !state.standingsOpen);
-    els.toggleStandingsBtn.setAttribute('aria-expanded', String(state.standingsOpen));
     els.toggleStandingsBtn.textContent = state.standingsOpen ? '▾' : '▸';
+    els.toggleStandingsBtn.setAttribute('aria-expanded', String(state.standingsOpen));
   });
 
   els.toggleRecentBtn.addEventListener('click', () => {
     state.recentOpen = !state.recentOpen;
-    toggleCollapsible(state.recentOpen, els.recentContent, els.toggleRecentBtn);
+    localStorage.setItem('recentOpen', String(state.recentOpen));
+    setCollapsible(els.recentContent, els.toggleRecentBtn, state.recentOpen);
   });
 
   els.toggleRecordBtn.addEventListener('click', () => {
     state.recordOpen = !state.recordOpen;
-    toggleCollapsible(state.recordOpen, els.recordContent, els.toggleRecordBtn);
+    localStorage.setItem('recordOpen', String(state.recordOpen));
+    setCollapsible(els.recordContent, els.toggleRecordBtn, state.recordOpen);
   });
 
   els.recentCalendar.addEventListener('click', (event) => {
     const button = event.target.closest('[data-game-id]');
     if (!button) return;
     state.selectedGameId = button.dataset.gameId;
-    renderRecentGames(state.dashboard?.recentGames || []);
-  });
-
-  els.recentGamesList.addEventListener('click', (event) => {
-    const card = event.target.closest('[data-game-id]');
-    if (!card) return;
-    state.selectedGameId = card.dataset.gameId;
     renderRecentGames(state.dashboard?.recentGames || []);
   });
 
@@ -438,12 +434,16 @@ function bindEvents() {
 function init() {
   populateTeams();
   applyTheme();
-  applyTeamAccent();
-  setRecentLimit(state.recentLimit);
+  applyTeam();
   setWriteMode('template');
-  toggleCollapsible(true, els.recentContent, els.toggleRecentBtn);
-  toggleCollapsible(true, els.recordContent, els.toggleRecordBtn);
+  setCollapsible(els.recentContent, els.toggleRecentBtn, state.recentOpen);
+  setCollapsible(els.recordContent, els.toggleRecordBtn, state.recordOpen);
+  els.fullStandingsWrap.classList.toggle('collapsed', !state.standingsOpen);
+  els.toggleStandingsBtn.textContent = state.standingsOpen ? '▾' : '▸';
+  els.toggleStandingsBtn.setAttribute('aria-expanded', String(state.standingsOpen));
+  els.heroRangeLabel.textContent = `${state.recentLimit} GAMES`;
   bindEvents();
+  setRecentLimit(state.recentLimit);
 }
 
 init();
