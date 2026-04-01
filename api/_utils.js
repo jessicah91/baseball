@@ -64,16 +64,41 @@ function htmlToLines(html = '') {
     .filter(Boolean);
 }
 
+function htmlToText(html = '') {
+  return htmlToLines(html).join(' ');
+}
+
 async function fetchHtml(url) {
   const response = await fetch(url, {
     headers: {
       'User-Agent': 'Mozilla/5.0',
       'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
     },
-    cache: 'no-store'
+    cache: 'no-store',
+    redirect: 'follow'
   });
   if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.status}`);
   return response.text();
+}
+
+async function fetchHtmlWithTimeout(url, timeoutMs = 4500) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error('timeout')), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
+      },
+      cache: 'no-store',
+      redirect: 'follow',
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.status}`);
+    return await response.text();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function inferOpponent(game, team) {
@@ -90,6 +115,8 @@ module.exports = {
   koreaDateString,
   shiftDate,
   htmlToLines,
+  htmlToText,
   fetchHtml,
+  fetchHtmlWithTimeout,
   inferOpponent
 };

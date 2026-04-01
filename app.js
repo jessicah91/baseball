@@ -349,36 +349,49 @@ function renderPreview() {
   els.previewResult.textContent = preview || '먼저 기록을 입력해줘.';
 }
 
+async function fetchRecentGames() {
+  els.recentCalendar.classList.add('loading');
+  els.recentCalendar.textContent = '최근 경기 데이터를 불러오는 중이에요.';
+  els.selectedGameDetail.textContent = '상세 데이터를 불러오는 중이에요.';
+  try {
+    const response = await fetch(`/api/recent-games?team=${state.myTeam}&limit=${state.recentLimit}`);
+    if (!response.ok) throw new Error(`recent ${response.status}`);
+    const data = await response.json();
+    state.dashboard = { ...(state.dashboard || {}), recentGames: data.recentGames || [] };
+    renderRecentGames(data.recentGames || []);
+  } catch (error) {
+    state.dashboard = { ...(state.dashboard || {}), recentGames: [] };
+    renderRecentGames([]);
+  }
+}
+
 async function fetchDashboard() {
   els.todayStatus.textContent = '불러오는 중';
   els.todayGameCard.classList.add('loading');
   els.myStandingCard.classList.add('loading');
-  els.recentCalendar.classList.add('loading');
   els.todayGameCard.textContent = '오늘 경기 정보를 불러오는 중이에요.';
   els.myStandingCard.textContent = '순위 정보를 불러오는 중이에요.';
-  els.recentCalendar.textContent = '최근 경기 데이터를 불러오는 중이에요.';
   els.standingsTable.innerHTML = '';
-  els.selectedGameDetail.textContent = '상세 데이터를 불러오는 중이에요.';
 
   try {
-    const response = await fetch(`/api/kbo-dashboard?team=${state.myTeam}&limit=${state.recentLimit}`);
+    const response = await fetch(`/api/kbo-dashboard?team=${state.myTeam}`);
     if (!response.ok) throw new Error(`dashboard ${response.status}`);
     const data = await response.json();
-    state.dashboard = data;
+    state.dashboard = { ...(state.dashboard || {}), ...data, recentGames: [] };
     renderTodayGame(data.myTodayGame || null);
     renderMyStanding(data.myStanding || null);
     renderStandings(data.standings || []);
-    renderRecentGames(data.recentGames || []);
-    if ((data.standings || []).length || (data.recentGames || []).length || data.myTodayGame) {
+    if ((data.standings || []).length || data.myTodayGame) {
       els.todayStatus.textContent = data.myTodayGame?.statusLabel || '업데이트 완료';
     }
   } catch (error) {
-    state.dashboard = null;
+    state.dashboard = { recentGames: [] };
     renderTodayGame(null);
     renderMyStanding(null);
     renderStandings([]);
-    renderRecentGames([]);
   }
+
+  fetchRecentGames();
 }
 
 function bindEvents() {

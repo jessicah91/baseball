@@ -25,3 +25,10 @@
 2. 위 폰트 3개를 `fonts/` 폴더에 넣기
 3. GitHub push
 4. Vercel 재배포
+
+
+## Data fetching notes
+
+- `/api/kbo-dashboard` now loads **today's game + standings** first so the main screen can render quickly.
+- `/api/recent-games` loads the recent 5/10 games separately so a slow recent-games fetch does not blank the whole page.
+- The site uses **KBO official English Daily Schedule / Scoreboard / Team Standings** pages as the main source.
