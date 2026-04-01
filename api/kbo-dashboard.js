@@ -5,7 +5,6 @@ const {
   toKoreanTeam,
   koreaDateString,
   htmlToLines,
-  htmlToText,
   fetchHtmlWithTimeout,
   inferOpponent
 } = require('./_utils');
@@ -77,62 +76,12 @@ function parseScoreboard(lines, searchDate) {
     }
   }
 
-  const unique = new Map();
-  games.forEach(game => {
-    if (!unique.has(game.id)) unique.set(game.id, game);
-  });
-  return [...unique.values()];
+  return [...new Map(games.map(game => [game.id, game])).values()];
 }
 
-function parseDailyScheduleForDate(text, searchDate) {
-  const date = new Date(`${searchDate}T00:00:00+09:00`);
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const dd = String(date.getDate()).padStart(2, '0');
-  const tag = `${mm}.${dd}(`;
-  const normalized = text.replace(/\s+/g, ' ').trim();
-  const start = normalized.indexOf(tag);
-  if (start === -1) return [];
-  const rest = normalized.slice(start);
-  const nextMatch = rest.slice(1).match(/\b\d{2}\.\d{2}\([A-Z]{3}\)\s+REGULAR\b/);
-  const block = nextMatch ? rest.slice(0, nextMatch.index + 1) : rest;
-  const games = [];
-  const re = new RegExp(`(\\d{1,2}:\\d{2})\\s+(${TEAM_PATTERN})\\s+(\\d+:\\d+|:)\\s+(${TEAM_PATTERN})\\s+((?:[A-Z0-9-]+\\s+)*)?([A-Z][A-Z0-9-]+)\\s+-`, 'g');
-  let match;
-  while ((match = re.exec(block)) !== null) {
-    const [, time, away, scoreToken, home, , stadium] = match;
-    let awayScore = null;
-    let homeScore = null;
-    let isFinal = false;
-    if (scoreToken !== ':') {
-      const parts = scoreToken.split(':').map(Number);
-      awayScore = Number.isFinite(parts[0]) ? parts[0] : null;
-      homeScore = Number.isFinite(parts[1]) ? parts[1] : null;
-      isFinal = awayScore !== null && homeScore !== null;
-    }
-    games.push({
-      id: `${searchDate}-${away}-${home}`,
-      date: searchDate,
-      away,
-      home,
-      awayScore,
-      homeScore,
-      isFinal,
-      statusLabel: isFinal ? '경기 종료' : '경기 예정',
-      stadium,
-      time,
-      winningPitcher: null,
-      losingPitcher: null,
-      savePitcher: null
-    });
-  }
-  return games;
-}
-
-function parseStandingsKorean(lines) {
+function parseStandingsDaily(lines) {
   const standings = [];
   let inTable = false;
-  const rowRe = /^(\d+)\s+(KT|SSG|NC|한화|롯데|삼성|두산|LG|KIA|키움)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+([\d.]+)\s+([\d.\-]+)\s+(\d+승\d+무\d+패)\s+(\d+승|\d+패|\d+무|-)\s+([\d-]+)\s+([\d-]+)$/;
-
   for (const line of lines) {
     if (line.startsWith('순위 팀명 경기 승 패 무 승률 게임차 최근10경기 연속 홈 방문')) {
       inTable = true;
@@ -140,13 +89,14 @@ function parseStandingsKorean(lines) {
     }
     if (!inTable) continue;
     if (line.startsWith('팀간 승패표')) break;
-    const m = line.match(rowRe);
-    if (!m) continue;
-    const [, rank, teamKo, games, wins, losses, draws, pct, gb, recent10, streak, home, away] = m;
-    const team = normalizeTeam(teamKo);
+
+    const tokens = line.trim().split(/\s+/);
+    if (tokens.length < 12) continue;
+    const [rank, teamKo, games, wins, losses, draws, pct, gb, recent10, streak, home, away] = tokens;
+    if (!/^\d+$/.test(rank) || !/^\d+$/.test(games)) continue;
     standings.push({
       rank: Number(rank),
-      team,
+      team: normalizeTeam(teamKo),
       teamKo,
       games: Number(games),
       wins: Number(wins),
@@ -160,7 +110,6 @@ function parseStandingsKorean(lines) {
       away
     });
   }
-
   return standings;
 }
 
@@ -175,26 +124,17 @@ module.exports = async (req, res) => {
   const team = normalizeTeam(req.query.team || 'LG');
   const today = koreaDateString();
 
-  const scoreboardPromise = fetchHtmlWithTimeout(`https://eng.koreabaseball.com/Schedule/Scoreboard.aspx?searchDate=${today}`, 3500);
-  const standingsPromise = fetchHtmlWithTimeout('https://www.koreabaseball.com/Record/TeamRank/TeamRank.aspx', 3500);
-  const dailyPromise = fetchHtmlWithTimeout('https://eng.koreabaseball.com/Schedule/DailySchedule.aspx', 3500);
-
-  const [scoreboardResult, standingsResult, dailyResult] = await Promise.allSettled([
-    scoreboardPromise,
-    standingsPromise,
-    dailyPromise
+  const [scoreboardResult, standingsResult] = await Promise.allSettled([
+    fetchHtmlWithTimeout(`https://eng.koreabaseball.com/Schedule/Scoreboard.aspx?searchDate=${today}`, 5000),
+    fetchHtmlWithTimeout('https://www.koreabaseball.com/Record/TeamRank/TeamRankDaily.aspx', 6000)
   ]);
 
-  let todayGames = scoreboardResult.status === 'fulfilled'
+  const todayGames = scoreboardResult.status === 'fulfilled'
     ? parseScoreboard(htmlToLines(scoreboardResult.value), today)
     : [];
 
-  if (!todayGames.length && dailyResult.status === 'fulfilled') {
-    todayGames = parseDailyScheduleForDate(htmlToText(dailyResult.value), today);
-  }
-
   const standings = standingsResult.status === 'fulfilled'
-    ? parseStandingsKorean(htmlToLines(standingsResult.value))
+    ? parseStandingsDaily(htmlToLines(standingsResult.value))
     : [];
 
   const rawTodayGame = todayGames.find(game => game.home === team || game.away === team) || null;
@@ -229,8 +169,7 @@ module.exports = async (req, res) => {
     recentGames: [],
     errors: {
       scoreboard: scoreboardResult.status === 'rejected' ? String(scoreboardResult.reason) : null,
-      standings: standingsResult.status === 'rejected' ? String(standingsResult.reason) : null,
-      dailySchedule: dailyResult.status === 'rejected' ? String(dailyResult.reason) : null
+      standings: standingsResult.status === 'rejected' ? String(standingsResult.reason) : null
     }
   });
 };

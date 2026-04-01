@@ -269,8 +269,9 @@ textarea:focus {
   gap: 8px;
 }
 .segmented-compact {
-  grid-template-columns: repeat(2, minmax(0, 132px));
+  grid-template-columns: repeat(2, minmax(0, 96px));
   justify-content: start;
+  max-width: 208px;
 }
 .compact-panel {
   padding-top: 14px;
@@ -302,6 +303,17 @@ textarea:focus {
   box-shadow: 0 2px 0 rgba(255,255,255,0.18) inset, 0 -4px 0 rgba(0,0,0,0.22) inset, 0 10px 22px rgba(var(--accent-rgb), 0.28);
 }
 .ui-btn.ghost { background: rgba(var(--accent-rgb),0.05); }
+
+body:not([data-theme="dark"]) .segmented-btn.active,
+body:not([data-theme="dark"]) .ui-btn.primary {
+  color: #0f172a;
+  text-shadow: none;
+}
+
+body[data-theme="dark"] .segmented-btn.active,
+body[data-theme="dark"] .ui-btn.primary {
+  color: #ffffff;
+}
 .ui-btn.compact { min-height: 40px; padding: 0 12px; }
 .collapse-btn {
   width: 40px;

@@ -5,9 +5,9 @@ const {
   koreaDateString,
   shiftDate,
   htmlToLines,
-  htmlToText,
   fetchHtmlWithTimeout,
-  inferOpponent
+  inferOpponent,
+  chunk
 } = require('./_utils');
 
 function parsePitcherMeta(line = '') {
@@ -54,40 +54,6 @@ function parseScoreboard(lines, searchDate) {
   return games;
 }
 
-function parseDailyScheduleMonth(text, year) {
-  const normalized = text.replace(/\s+/g, ' ').trim();
-  const dateBlockRe = /(\d{2})\.(\d{2})\([A-Z]{3}\)\s+REGULAR\s+([\s\S]*?)(?=(\d{2}\.\d{2}\([A-Z]{3}\)\s+REGULAR)|$)/g;
-  const games = [];
-  let block;
-  while ((block = dateBlockRe.exec(normalized)) !== null) {
-    const [, mm, dd, body] = block;
-    const searchDate = `${year}-${mm}-${dd}`;
-    const gameRe = new RegExp(`(\\d{1,2}:\\d{2})\\s+(${TEAM_PATTERN})\\s+(\\d+:\\d+|:)\\s+(${TEAM_PATTERN})\\s+((?:[A-Z0-9-]+\\s+)*)?([A-Z][A-Z0-9-]+)\\s+-`, 'g');
-    let match;
-    while ((match = gameRe.exec(body)) !== null) {
-      const [, time, away, scoreToken, home, , stadium] = match;
-      if (scoreToken === ':') continue;
-      const [awayScore, homeScore] = scoreToken.split(':').map(Number);
-      games.push({
-        id: `${searchDate}-${away}-${home}`,
-        date: searchDate,
-        away,
-        home,
-        awayScore,
-        homeScore,
-        isFinal: true,
-        statusLabel: '경기 종료',
-        stadium,
-        time,
-        winningPitcher: null,
-        losingPitcher: null,
-        savePitcher: null
-      });
-    }
-  }
-  return games;
-}
-
 function decorateRecentGame(game, team) {
   const isHome = game.home === team;
   const myScore = isHome ? game.homeScore : game.awayScore;
@@ -121,46 +87,39 @@ module.exports = async (req, res) => {
   const team = normalizeTeam(req.query.team || 'LG');
   const limit = Number(req.query.limit || 5) === 10 ? 10 : 5;
   const today = koreaDateString();
-  const currentYear = today.slice(0, 4);
-  const results = [];
-  const seen = new Set();
   const errors = [];
+  const seen = new Set();
+  const results = [];
 
-  try {
-    const monthHtml = await fetchHtmlWithTimeout('https://eng.koreabaseball.com/Schedule/DailySchedule.aspx', 3500);
-    const monthGames = parseDailyScheduleMonth(htmlToText(monthHtml), currentYear)
-      .filter(game => game.date < today && (game.away === team || game.home === team))
-      .sort((a, b) => b.date.localeCompare(a.date));
-
-    for (const game of monthGames) {
-      if (seen.has(game.id)) continue;
-      seen.add(game.id);
-      results.push(decorateRecentGame(game, team));
-      if (results.length >= limit) break;
-    }
-  } catch (error) {
-    errors.push(`daily-schedule:${String(error)}`);
+  const lookbackDays = 35;
+  const dates = [];
+  for (let offset = 1; offset <= lookbackDays; offset += 1) {
+    dates.push(shiftDate(today, -offset));
   }
 
-  if (results.length < limit) {
-    const maxLookback = limit === 10 ? 12 : 7;
-    for (let offset = 1; offset <= maxLookback && results.length < limit; offset += 1) {
-      const date = shiftDate(today, -offset);
-      try {
-        const html = await fetchHtmlWithTimeout(`https://eng.koreabaseball.com/Schedule/Scoreboard.aspx?searchDate=${date}`, 2200);
-        const games = parseScoreboard(htmlToLines(html), date)
-          .filter(game => game.isFinal && (game.away === team || game.home === team));
-        for (const game of games) {
-          if (seen.has(game.id)) continue;
-          seen.add(game.id);
-          results.push(decorateRecentGame(game, team));
-          if (results.length >= limit) break;
-        }
-      } catch (error) {
-        errors.push(`scoreboard:${date}:${String(error)}`);
+  for (const batch of chunk(dates, 5)) {
+    if (results.length >= limit) break;
+    const settled = await Promise.allSettled(
+      batch.map(date => fetchHtmlWithTimeout(`https://eng.koreabaseball.com/Schedule/Scoreboard.aspx?searchDate=${date}`, 5000))
+    );
+
+    settled.forEach((item, index) => {
+      const date = batch[index];
+      if (item.status === 'rejected') {
+        errors.push(`scoreboard:${date}:${String(item.reason)}`);
+        return;
       }
-    }
+      const games = parseScoreboard(htmlToLines(item.value), date)
+        .filter(game => game.isFinal && (game.away === team || game.home === team));
+      for (const game of games) {
+        if (seen.has(game.id)) continue;
+        seen.add(game.id);
+        results.push(decorateRecentGame(game, team));
+      }
+    });
   }
+
+  results.sort((a, b) => b.date.localeCompare(a.date));
 
   return res.status(200).json({
     source: 'kbo-official',
