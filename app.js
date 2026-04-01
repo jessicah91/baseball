@@ -1,577 +1,534 @@
-const STORAGE_KEY = 'baseball-note-entries-v2';
-    const KBO_TEAMS = ['LG 트윈스', 'KIA 타이거즈', '삼성 라이온즈', '두산 베어스', 'SSG 랜더스', 'KT 위즈', '한화 이글스', '롯데 자이언츠', 'NC 다이노스', '키움 히어로즈'];
+const KBO_TEAMS = [
+  'KIA 타이거즈', '삼성 라이온즈', 'LG 트윈스', '두산 베어스', 'KT 위즈',
+  'SSG 랜더스', '롯데 자이언츠', '한화 이글스', 'NC 다이노스', '키움 히어로즈'
+];
 
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    const todayStr = `${yyyy}-${mm}-${dd}`;
-    document.getElementById('gameDate').value = todayStr;
+const STORAGE_KEY = 'baseball_note_entries_v2';
+const SETTINGS_KEY = 'baseball_note_settings_v1';
 
-    const demoDashboard = {
-      source: 'demo',
-      lastUpdated: '샘플 데이터',
-      games: [
-        { date: todayStr, away: 'KIA 타이거즈', awayScore: 2, home: 'LG 트윈스', homeScore: 7, state: 'FINAL', stadium: '잠실' },
-        { date: todayStr, away: 'KT 위즈', awayScore: 14, home: '한화 이글스', homeScore: 11, state: 'FINAL', stadium: '대전' },
-        { date: todayStr, away: '롯데 자이언츠', awayScore: 4, home: 'NC 다이노스', homeScore: 5, state: 'FINAL', stadium: '창원' },
-        { date: todayStr, away: '두산 베어스', awayScore: 3, home: '삼성 라이온즈', homeScore: 13, state: 'FINAL', stadium: '대구' },
-        { date: todayStr, away: '키움 히어로즈', awayScore: 11, home: 'SSG 랜더스', homeScore: 2, state: 'FINAL', stadium: '문학' }
-      ],
-      standings: [
-        { rank: 1, team: 'KT 위즈', w: 4, l: 0, d: 0, pct: '1.000', gb: '0.0' },
-        { rank: 2, team: 'SSG 랜더스', w: 3, l: 1, d: 0, pct: '.750', gb: '1.0' },
-        { rank: 2, team: 'NC 다이노스', w: 3, l: 1, d: 0, pct: '.750', gb: '1.0' },
-        { rank: 4, team: '한화 이글스', w: 2, l: 2, d: 0, pct: '.500', gb: '2.0' },
-        { rank: 4, team: '롯데 자이언츠', w: 2, l: 2, d: 0, pct: '.500', gb: '2.0' },
-        { rank: 6, team: '두산 베어스', w: 1, l: 2, d: 1, pct: '.333', gb: '2.5' },
-        { rank: 6, team: '삼성 라이온즈', w: 1, l: 2, d: 1, pct: '.333', gb: '2.5' },
-        { rank: 8, team: 'KIA 타이거즈', w: 1, l: 3, d: 0, pct: '.250', gb: '3.0' },
-        { rank: 8, team: 'LG 트윈스', w: 1, l: 3, d: 0, pct: '.250', gb: '3.0' },
-        { rank: 8, team: '키움 히어로즈', w: 1, l: 3, d: 0, pct: '.250', gb: '3.0' }
-      ]
-    };
+const state = {
+  mode: 'template',
+  softenMode: 'gpt',
+  selectedVariant: '',
+  currentVariants: [],
+  dashboard: { games: [], standings: [], updatedAt: null },
+  myTeam: '',
+  nickname: ''
+};
 
-    let currentDashboard = demoDashboard;
-    let currentMode = 'template';
-    let softenMode = 'local';
-    let currentVariants = [];
-    let selectedVariant = '';
-    let animationFrame = null;
+const demoDashboard = {
+  updatedAt: new Date().toISOString(),
+  games: [
+    { date: '2026-04-02', home: 'LG 트윈스', away: '두산 베어스', status: '경기 종료', score: '5 : 3' },
+    { date: '2026-04-02', home: 'KIA 타이거즈', away: '삼성 라이온즈', status: '경기 종료', score: '4 : 6' },
+    { date: '2026-04-02', home: 'KT 위즈', away: '롯데 자이언츠', status: '경기 예정', score: '-' },
+    { date: '2026-04-02', home: '한화 이글스', away: 'SSG 랜더스', status: '경기 종료', score: '2 : 1' },
+    { date: '2026-04-02', home: 'NC 다이노스', away: '키움 히어로즈', status: '경기 종료', score: '7 : 7' }
+  ],
+  standings: [
+    { rank: 1, team: 'LG 트윈스', win: 8, lose: 3, draw: 0, pct: '0.727', gb: '-' },
+    { rank: 2, team: 'KIA 타이거즈', win: 7, lose: 4, draw: 0, pct: '0.636', gb: '1.0' },
+    { rank: 3, team: '한화 이글스', win: 7, lose: 4, draw: 0, pct: '0.636', gb: '1.0' },
+    { rank: 4, team: '삼성 라이온즈', win: 6, lose: 5, draw: 0, pct: '0.545', gb: '2.0' },
+    { rank: 5, team: '롯데 자이언츠', win: 5, lose: 5, draw: 1, pct: '0.500', gb: '2.5' },
+    { rank: 6, team: '두산 베어스', win: 5, lose: 6, draw: 0, pct: '0.455', gb: '3.0' },
+    { rank: 7, team: 'SSG 랜더스', win: 4, lose: 6, draw: 1, pct: '0.400', gb: '3.5' },
+    { rank: 8, team: 'KT 위즈', win: 4, lose: 7, draw: 0, pct: '0.364', gb: '4.0' },
+    { rank: 9, team: 'NC 다이노스', win: 3, lose: 7, draw: 1, pct: '0.300', gb: '4.5' },
+    { rank: 10, team: '키움 히어로즈', win: 2, lose: 8, draw: 1, pct: '0.200', gb: '5.5' }
+  ]
+};
 
-    function escapeHtml(text = '') {
-      return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    }
+const el = (id) => document.getElementById(id);
 
-    function populateTeams() {
-      const teamSelect = document.getElementById('team');
-      const opponentSelect = document.getElementById('opponent');
-      teamSelect.innerHTML = KBO_TEAMS.map((team) => `<option>${team}</option>`).join('');
+function escapeHtml(str = '') {
+  return String(str)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
 
-      function renderOpponents() {
-        const teamValue = teamSelect.value;
-        const others = KBO_TEAMS.filter((team) => team !== teamValue);
-        opponentSelect.innerHTML = others.map((team) => `<option>${team}</option>`).join('');
-      }
+function populateTeamSelects() {
+  const myTeamSelect = el('myTeamSelect');
+  const teamSelect = el('team');
+  [myTeamSelect, teamSelect].forEach((select) => {
+    select.innerHTML = '<option value="">팀 선택</option>' + KBO_TEAMS.map((team) => `<option value="${team}">${team}</option>`).join('');
+  });
+  updateOpponentOptions(state.myTeam || teamSelect.value || '');
+}
 
-      teamSelect.addEventListener('change', renderOpponents);
-      renderOpponents();
-    }
+function updateOpponentOptions(selectedTeam) {
+  const opponent = el('opponent');
+  const options = KBO_TEAMS.filter((team) => team !== selectedTeam);
+  opponent.innerHTML = '<option value="">상대 팀 선택</option>' + options.map((team) => `<option value="${team}">${team}</option>`).join('');
+}
 
-    populateTeams();
+function getSettings() {
+  try {
+    return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
 
-    const modeButtons = document.querySelectorAll('.mode-toggle');
-    const templateFields = document.getElementById('templateFields');
-    const freeformField = document.getElementById('freeformField');
-    modeButtons.forEach((button) => {
-      button.addEventListener('click', () => {
-        modeButtons.forEach((btn) => btn.classList.remove('active'));
-        button.classList.add('active');
-        currentMode = button.dataset.mode;
-        templateFields.classList.toggle('hidden', currentMode !== 'template');
-        freeformField.classList.toggle('hidden', currentMode !== 'freeform');
-      });
+function saveSettings(next) {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+}
+
+function applySettingsToUI() {
+  el('myTeamSelect').value = state.myTeam;
+  el('myNickname').value = state.nickname;
+  el('team').value = state.myTeam;
+  updateOpponentOptions(state.myTeam);
+  renderMyTeamSummary();
+}
+
+function renderMyTeamSummary() {
+  const summary = el('myTeamSummary');
+  if (!state.myTeam) {
+    summary.textContent = '아직 마이팀이 설정되지 않았어요.';
+    return;
+  }
+  summary.textContent = `${state.nickname || '기록자'}님의 마이팀은 ${state.myTeam}입니다. 아래 경기와 기록 화면이 이 팀 기준으로 맞춰집니다.`;
+}
+
+function selectedEmotion() {
+  const active = document.querySelector('.emotion.active');
+  return active ? active.textContent.trim() : '감정 미선택';
+}
+
+function bindEmotionButtons() {
+  document.querySelectorAll('.emotion').forEach((button) => {
+    button.addEventListener('click', () => {
+      document.querySelectorAll('.emotion').forEach((b) => b.classList.remove('active'));
+      button.classList.add('active');
     });
+  });
+}
 
-    const emotionButtons = document.querySelectorAll('.emotion');
-    emotionButtons.forEach((button) => {
-      button.addEventListener('click', () => {
-        emotionButtons.forEach((btn) => btn.classList.remove('active'));
-        button.classList.add('active');
-      });
+function bindModeButtons() {
+  document.querySelectorAll('.mode-toggle').forEach((button) => {
+    button.addEventListener('click', () => {
+      document.querySelectorAll('.mode-toggle').forEach((b) => b.classList.remove('active'));
+      button.classList.add('active');
+      state.mode = button.dataset.mode;
+      el('templateFields').classList.toggle('hidden', state.mode !== 'template');
+      el('freeformField').classList.toggle('hidden', state.mode !== 'freeform');
     });
+  });
+}
 
-    document.querySelectorAll('#softenTabs button').forEach((button) => {
-      button.addEventListener('click', () => {
-        document.querySelectorAll('#softenTabs button').forEach((btn) => btn.classList.remove('active'));
-        button.classList.add('active');
-        softenMode = button.dataset.soften;
-        document.getElementById('softenModeNote').innerHTML = softenMode === 'local'
-          ? '로컬 순화는 파일만으로 바로 작동합니다. 욕설, 팀/감독/수비/불펜 같은 키워드를 보고 기록용 문장으로 바꿉니다.'
-          : 'GPT 순화는 같은 도메인에 <code>/api/soften</code>가 있을 때 사용됩니다. 연결이 없으면 자동으로 로컬 순화로 대체됩니다.';
-      });
+function bindSoftenTabs() {
+  document.querySelectorAll('#softenTabs button').forEach((button) => {
+    button.addEventListener('click', () => {
+      document.querySelectorAll('#softenTabs button').forEach((b) => b.classList.remove('active'));
+      button.classList.add('active');
+      state.softenMode = button.dataset.soften;
+      el('softenModeNote').textContent = state.softenMode === 'gpt'
+        ? 'GPT 순화가 먼저 시도되고, 서버 설정이 없거나 실패하면 자동으로 로컬 순화 결과로 넘어가요.'
+        : '로컬 순화는 API 없이 바로 동작해요.';
     });
+  });
+}
 
-    function renderDashboard(data) {
-      currentDashboard = data;
-      const gamesList = document.getElementById('gamesList');
-      const standingsBody = document.getElementById('standingsBody');
-      const quickSelect = document.getElementById('gameQuickSelect');
-      document.getElementById('dataModeTag').textContent = data.source === 'api' ? '실데이터' : '데모 모드';
-      document.getElementById('dataModeTag').className = `tag ${data.source === 'api' ? 'good' : 'info'}`;
-      document.getElementById('lastUpdatedTag').textContent = data.lastUpdated || '업데이트 정보 없음';
-      document.getElementById('dashboardStatus').textContent = data.source === 'api'
-        ? '연결된 백엔드에서 실제 경기 데이터와 순위표를 불러왔습니다.'
-        : '현재는 샘플 데이터가 보이고 있습니다. 나중에 백엔드를 붙이면 이 자리에 실제 경기 결과와 순위가 들어옵니다.';
+function formatDateLabel(dateString) {
+  if (!dateString) return '날짜 미정';
+  return dateString;
+}
 
-      gamesList.innerHTML = data.games.map((game, index) => `
-        <article class="game-card">
-          <div class="game-head">
-            <strong>${escapeHtml(game.date || todayStr)} · ${escapeHtml(game.stadium || '-')}</strong>
-            <span class="tag ${game.state === 'FINAL' ? 'good' : 'warn'}">${escapeHtml(game.state || '예정')}</span>
-          </div>
-          <div class="scoreline">
-            <div class="team-side">${escapeHtml(game.away)}</div>
-            <div class="score">${game.awayScore ?? '-'} : ${game.homeScore ?? '-'}</div>
-            <div class="team-side">${escapeHtml(game.home)}</div>
-          </div>
-          <div class="small-note" style="margin-top:10px;">기록에 넣기용 번호: ${index + 1}</div>
-        </article>
-      `).join('');
+function parseScore(score) {
+  if (!score || !score.includes(':')) return null;
+  const [left, right] = score.split(':').map((v) => Number(v.trim()));
+  if (Number.isNaN(left) || Number.isNaN(right)) return null;
+  return [left, right];
+}
 
-      standingsBody.innerHTML = data.standings.map((row) => `
-        <tr>
-          <td>${escapeHtml(String(row.rank))}</td>
-          <td>${escapeHtml(row.team)}</td>
-          <td>${escapeHtml(String(row.w))}</td>
-          <td>${escapeHtml(String(row.l))}</td>
-          <td>${escapeHtml(String(row.d))}</td>
-          <td>${escapeHtml(String(row.pct))}</td>
-          <td>${escapeHtml(String(row.gb))}</td>
-        </tr>
-      `).join('');
+function getGamePerspective(game, myTeam) {
+  const isHome = game.home === myTeam;
+  const opponent = isHome ? game.away : game.home;
+  const rawScore = parseScore(game.score);
+  let result = '예정';
+  if (rawScore && game.status.includes('종료')) {
+    const [homeScore, awayScore] = rawScore;
+    const myScore = isHome ? homeScore : awayScore;
+    const oppScore = isHome ? awayScore : homeScore;
+    result = myScore > oppScore ? '승' : myScore < oppScore ? '패' : '무';
+  }
+  return { opponent, result };
+}
 
-      quickSelect.innerHTML = '<option value="">오늘 경기 선택</option>' + data.games.map((game, index) => `
-        <option value="${index}">${escapeHtml(game.away)} vs ${escapeHtml(game.home)} · ${escapeHtml(game.state || '')}</option>
-      `).join('');
-    }
+function renderStandings(standings) {
+  const body = el('standingsBody');
+  body.innerHTML = standings.map((row) => `
+    <tr class="${row.team === state.myTeam ? 'table-highlight' : ''}">
+      <td>${row.rank}</td>
+      <td>${escapeHtml(row.team)}</td>
+      <td>${row.win}</td>
+      <td>${row.lose}</td>
+      <td>${row.draw}</td>
+      <td>${escapeHtml(row.pct || '-')}</td>
+      <td>${escapeHtml(row.gb || '-')}</td>
+    </tr>
+  `).join('');
+}
 
-    async function loadDashboard() {
-      try {
-        const response = await fetch(`/api/kbo/dashboard?date=${todayStr}`, { headers: { 'Accept': 'application/json' } });
-        if (!response.ok) throw new Error('API 응답 실패');
-        const data = await response.json();
-        renderDashboard({ ...data, source: 'api' });
-      } catch (error) {
-        renderDashboard(demoDashboard);
-      }
-    }
+function renderMyTeamGames() {
+  const list = el('myTeamGamesList');
+  const quick = el('gameQuickSelect');
+  if (!state.myTeam) {
+    list.innerHTML = '<div class="result-line">마이팀을 먼저 설정해 주세요.</div>';
+    quick.innerHTML = '<option value="">마이팀 설정 후 선택 가능</option>';
+    return;
+  }
 
-    document.getElementById('refreshDashboardBtn').addEventListener('click', loadDashboard);
+  const filtered = state.dashboard.games.filter((game) => game.home === state.myTeam || game.away === state.myTeam);
+  if (!filtered.length) {
+    list.innerHTML = `<div class="result-line">${escapeHtml(state.myTeam)} 경기 데이터가 아직 없어요.</div>`;
+    quick.innerHTML = '<option value="">선택 가능한 경기가 없어요</option>';
+    return;
+  }
 
-    document.getElementById('gameQuickSelect').addEventListener('change', (event) => {
-      const idx = Number(event.target.value);
-      if (Number.isNaN(idx) || !currentDashboard.games[idx]) return;
-      const game = currentDashboard.games[idx];
-      const teamSelect = document.getElementById('team');
-      const opponentSelect = document.getElementById('opponent');
-
-      if (KBO_TEAMS.includes(game.home)) {
-        teamSelect.value = game.home;
-      }
-      teamSelect.dispatchEvent(new Event('change'));
-      if (game.home === teamSelect.value && KBO_TEAMS.includes(game.away)) {
-        opponentSelect.value = game.away;
-      } else if (KBO_TEAMS.includes(game.home)) {
-        opponentSelect.value = game.home;
-      }
-      document.getElementById('gameDate').value = game.date || todayStr;
-      document.getElementById('gameResultMemo').value = `${game.away} ${game.awayScore ?? '-'} : ${game.homeScore ?? '-'} ${game.home} / ${game.state || ''}`;
-      window.location.hash = '#record';
-    });
-
-    function selectedEmotion() {
-      return document.querySelector('.emotion.active')?.textContent || '감정 미선택';
-    }
-
-    function buildTemplateContent() {
-      return [
-        `경기 결과 / 메모: ${document.getElementById('gameResultMemo').value || '미입력'}`,
-        `\n한줄 요약\n${document.getElementById('summary').value || '미입력'}`,
-        `\n좋았던 장면\n${document.getElementById('bestScene').value || '미입력'}`,
-        `\n아쉬웠던 장면\n${document.getElementById('sadScene').value || '미입력'}`,
-        `\n이해 안 갔던 룰 / 판정\n${document.getElementById('confusingRule').value || '미입력'}`,
-        `\n다음 경기에서 보고 싶은 점\n${document.getElementById('nextGame').value || '미입력'}`
-      ].join('\n');
-    }
-
-    function buildPreviewData() {
-      const team = document.getElementById('team').value;
-      const date = document.getElementById('gameDate').value;
-      const opponent = document.getElementById('opponent').value || '상대팀 미입력';
-      const visibility = document.getElementById('visibility').value;
-      const title = `${team} vs ${opponent}`;
-      const content = currentMode === 'template'
-        ? buildTemplateContent()
-        : `경기 결과 / 메모: ${document.getElementById('gameResultMemo').value || '미입력'}\n\n${document.getElementById('freeText').value || '내용 없음'}`;
-      return { team, date, opponent, visibility, emotion: selectedEmotion(), title, content };
-    }
-
-    function renderPreview() {
-      const previewArea = document.getElementById('previewArea');
-      const data = buildPreviewData();
-      previewArea.innerHTML = `
-        <div class="preview-meta">
-          <span class="tag">${escapeHtml(data.team)}</span>
-          <span class="tag">${escapeHtml(data.date || '날짜 미입력')}</span>
-          <span class="tag">${escapeHtml(data.emotion)}</span>
-          <span class="tag">${escapeHtml(data.visibility)}</span>
+  list.innerHTML = filtered.map((game, index) => {
+    const info = getGamePerspective(game, state.myTeam);
+    const badgeClass = info.result === '승' ? 'win' : info.result === '패' ? 'loss' : info.result === '무' ? 'draw' : '';
+    return `
+      <article class="game-item ${index === 0 ? 'active' : ''}" data-game-index="${index}">
+        <div class="game-top">
+          <div class="game-title">${escapeHtml(state.myTeam)} vs ${escapeHtml(info.opponent)}</div>
+          <div class="result-badge ${badgeClass}">${escapeHtml(info.result)}</div>
         </div>
-        <h5>${escapeHtml(data.title)}</h5>
-        <div class="content">${escapeHtml(data.content)}</div>
-      `;
+        <div class="game-sub">${escapeHtml(formatDateLabel(game.date))} · ${escapeHtml(game.status)} · ${escapeHtml(game.score)}</div>
+      </article>
+    `;
+  }).join('');
+
+  quick.innerHTML = '<option value="">내 팀 경기 선택</option>' + filtered.map((game, index) => {
+    const info = getGamePerspective(game, state.myTeam);
+    return `<option value="${index}">${game.date} · ${state.myTeam} vs ${info.opponent} · ${info.result} (${game.score})</option>`;
+  }).join('');
+
+  quick.onchange = () => applyQuickGame(filtered[quick.value]);
+  const firstGame = filtered[0];
+  if (firstGame) {
+    applyQuickGame(firstGame, false);
+  }
+}
+
+function applyQuickGame(game, scroll = false) {
+  if (!game || !state.myTeam) return;
+  const info = getGamePerspective(game, state.myTeam);
+  el('team').value = state.myTeam;
+  updateOpponentOptions(state.myTeam);
+  el('opponent').value = info.opponent;
+  el('gameDate').value = game.date;
+  el('gameResultMemo').value = `${state.myTeam} ${game.score} ${info.opponent} / ${info.result === '예정' ? '경기 전' : info.result}`;
+  if (scroll) {
+    document.getElementById('record').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+async function loadDashboard() {
+  const modeTag = el('dataModeTag');
+  const lastUpdated = el('lastUpdatedTag');
+  const status = el('dashboardStatus');
+  try {
+    const response = await fetch('/api/kbo-dashboard');
+    if (!response.ok) throw new Error('API not ready');
+    const data = await response.json();
+    state.dashboard = { games: data.games || [], standings: data.standings || [], updatedAt: data.updatedAt || null };
+    modeTag.textContent = 'API 연결';
+    status.textContent = '실제 API 응답을 불러왔어요. 마이팀 기준으로 경기만 필터링해서 보여줘요.';
+  } catch {
+    state.dashboard = demoDashboard;
+    modeTag.textContent = '데모 모드';
+    status.textContent = 'API가 없거나 실패해서 데모 데이터로 보여주고 있어요.';
+  }
+  lastUpdated.textContent = state.dashboard.updatedAt ? `업데이트 ${String(state.dashboard.updatedAt).slice(0, 16).replace('T', ' ')}` : '업데이트 정보 없음';
+  renderStandings(state.dashboard.standings);
+  renderMyTeamGames();
+}
+
+function buildTemplateParagraphs() {
+  const segments = [];
+  const summary = el('summary').value.trim();
+  const best = el('bestScene').value.trim();
+  const sad = el('sadScene').value.trim();
+  const rule = el('confusingRule').value.trim();
+  const next = el('nextGame').value.trim();
+  const resultMemo = el('gameResultMemo').value.trim();
+  const team = el('team').value || '응원 팀';
+  const opponent = el('opponent').value || '상대 팀';
+  const emotion = selectedEmotion();
+
+  const opener = summary || `${team}의 오늘 경기는 ${emotion}이라는 감정이 가장 크게 남는 경기였다.`;
+  segments.push(opener);
+  if (resultMemo) segments.push(`경기 결과를 한 줄로 정리하면 ${resultMemo}였다.`);
+  if (best) segments.push(`가장 좋았던 장면은 ${best.replace(/[.。]$/,'')}였다.`);
+  if (sad) segments.push(`반대로 가장 아쉬웠던 장면은 ${sad.replace(/[.。]$/,'')} 쪽이었다.`);
+  if (rule) segments.push(`중간에 ${rule.replace(/[.。]$/,'')} 부분은 다시 확인해보고 싶은 포인트로 남았다.`);
+  if (next) segments.push(`다음 ${team} vs ${opponent} 경기에서는 ${next.replace(/[.。]$/,'')} 부분을 더 기대하게 된다.`);
+  return segments.join(' ');
+}
+
+function buildFreeformParagraph() {
+  const free = el('freeText').value.trim();
+  const resultMemo = el('gameResultMemo').value.trim();
+  const team = el('team').value || '응원 팀';
+  const opponent = el('opponent').value || '상대 팀';
+  const emotion = selectedEmotion();
+  const intro = `${team}와 ${opponent}의 경기를 본 뒤 느낀 감정은 ${emotion} 쪽에 가까웠다.`;
+  const resultLine = resultMemo ? `경기 결과를 먼저 적어두면 ${resultMemo}였다.` : '';
+  return [intro, resultLine, free].filter(Boolean).join(' ');
+}
+
+function buildPreviewData() {
+  const team = el('team').value || '팀 미선택';
+  const date = el('gameDate').value || '날짜 미입력';
+  const opponent = el('opponent').value || '상대 팀 미입력';
+  const visibility = el('visibility').value;
+  const emotion = selectedEmotion();
+  const nickname = state.nickname || '기록자';
+  const title = `${team} vs ${opponent}`;
+  const paragraph = state.mode === 'template' ? buildTemplateParagraphs() : buildFreeformParagraph();
+  return { team, date, opponent, visibility, emotion, nickname, title, paragraph };
+}
+
+function renderPreview() {
+  const preview = buildPreviewData();
+  el('previewArea').innerHTML = `
+    <div class="preview-meta">
+      <span class="tag">${escapeHtml(preview.nickname)}</span>
+      <span class="tag">${escapeHtml(preview.team)}</span>
+      <span class="tag">${escapeHtml(preview.date)}</span>
+      <span class="tag">${escapeHtml(preview.emotion)}</span>
+      <span class="tag">${escapeHtml(preview.visibility)}</span>
+    </div>
+    <h5>${escapeHtml(preview.title)}</h5>
+    <div class="content">${escapeHtml(preview.paragraph || '아직 작성된 내용이 부족해요.')}</div>
+  `;
+}
+
+function getEntries() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveEntries(entries) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+}
+
+function renderSavedItems() {
+  const container = el('savedItems');
+  const entries = getEntries();
+  if (!entries.length) {
+    container.innerHTML = '<div class="result-line">아직 저장된 기록이 없습니다.</div>';
+    return;
+  }
+  container.innerHTML = entries.slice().reverse().map((entry) => `
+    <article class="saved-item">
+      <strong>${escapeHtml(entry.title)}</strong>
+      <div class="preview-meta" style="margin: 8px 0;">
+        <span class="tag">${escapeHtml(entry.date)}</span>
+        <span class="tag">${escapeHtml(entry.emotion)}</span>
+        <span class="tag">${escapeHtml(entry.visibility)}</span>
+      </div>
+      <div class="muted-note">${escapeHtml(entry.paragraph)}</div>
+    </article>
+  `).join('');
+}
+
+const harshPatterns = [
+  [/씨발+|시발+|ㅅㅂ+|병신+|ㅂㅅ+|좆같+|존나+|개같+|개빡+|개열받+|꺼져+|미친놈+|돌았냐+|미쳤냐+/gi, ''],
+  [/개답답|개노답|노답|답없네|답이 없네/gi, '많이 답답했다'],
+  [/열받|빡치|빡침|화남|환장/gi, '감정이 크게 올라왔다'],
+  [/망했|말아먹|터졌네/gi, '흐름이 무너졌다'],
+  [/못하네|못하냐|왜 이래/gi, '경기력이 아쉬웠다'],
+  [/최악/gi, '많이 아쉬웠다'],
+  [/어이없|황당/gi, '이해하기 어려웠다'],
+  [/ㅋㅋ+|ㅎ+/g, ' ']
+];
+
+const topicMap = [
+  { keys: ['감독', '교체', '라인업', '작전'], subject: '작전 선택', detail: '운영 타이밍' },
+  { keys: ['불펜', '투수', '볼배합', '제구', '사사구'], subject: '투수 운영', detail: '볼배합과 제구' },
+  { keys: ['수비', '실책', '송구', '포구'], subject: '수비 집중력', detail: '수비 처리' },
+  { keys: ['타선', '타격', '삼진', '득점권', '찬스'], subject: '타선 연결', detail: '득점 기회 처리' },
+  { keys: ['주루', '도루', '베이스러닝'], subject: '주루 판단', detail: '베이스러닝 선택' },
+  { keys: ['심판', '판정', '비디오판독'], subject: '판정 이해', detail: '판정 기준' }
+];
+
+function detectTopic(text) {
+  return topicMap.find((topic) => topic.keys.some((key) => text.includes(key))) || { subject: '경기 흐름', detail: '흐름 관리' };
+}
+
+function normalizeSentence(text) {
+  let result = text.trim();
+  harshPatterns.forEach(([pattern, replacement]) => {
+    result = result.replace(pattern, replacement);
+  });
+  return result.replace(/\s{2,}/g, ' ').replace(/[!~]+/g, '').trim();
+}
+
+function buildLocalVariants(text) {
+  const original = text.trim();
+  if (!original) return [];
+  const topic = detectTopic(original);
+  const cleaned = normalizeSentence(original);
+  return [
+    {
+      label: '차분하게',
+      text: `오늘 ${topic.subject} 부분에서 아쉬움이 크게 남았다. ${cleaned || `${topic.detail} 쪽에서 보완이 필요해 보였다.`}`.trim()
+    },
+    {
+      label: '기록형',
+      text: `경기 기록으로 남기면 ${topic.subject}에서 흐름을 내준 장면이 가장 먼저 떠오른다. ${cleaned || `${topic.detail} 장면이 특히 크게 남았다.`}`.trim()
+    },
+    {
+      label: '분석형',
+      text: `정리하면 ${topic.subject} 쪽에서 개선이 필요해 보였다. ${cleaned || `${topic.detail} 판단이 다음 경기의 포인트가 될 것 같다.`}`.trim()
     }
+  ];
+}
 
-    document.getElementById('previewBtn').addEventListener('click', renderPreview);
+async function buildGPTVariants(text) {
+  const response = await fetch('/api/soften', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, variants: ['차분하게', '기록형', '분석형'] })
+  });
+  if (!response.ok) throw new Error('GPT 순화 실패');
+  const data = await response.json();
+  if (!Array.isArray(data.variants)) throw new Error('응답 형식 오류');
+  return data.variants;
+}
 
-    function getEntries() {
-      try {
-        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-      } catch {
-        return [];
-      }
-    }
+function renderVariants(original, variants, sourceLabel) {
+  const helper = el('helperResult');
+  if (!original.trim()) {
+    helper.innerHTML = '<div class="result-line">문장을 먼저 입력해 주세요.</div>';
+    state.currentVariants = [];
+    state.selectedVariant = '';
+    return;
+  }
+  state.currentVariants = variants;
+  state.selectedVariant = variants[0]?.text || '';
+  helper.innerHTML = `
+    <div class="result-line">
+      <strong>원문</strong>
+      <div style="margin-top: 6px;">${escapeHtml(original)}</div>
+      <div class="small-note" style="margin-top: 8px;">${escapeHtml(sourceLabel)}</div>
+    </div>
+  ` + variants.map((variant, index) => `
+    <article class="variant-card ${index === 0 ? 'selected' : ''}" data-variant-index="${index}">
+      <div class="variant-meta">${escapeHtml(variant.label)}</div>
+      <div style="margin-top: 8px; line-height: 1.7;">${escapeHtml(variant.text)}</div>
+      <button type="button">이 문장 선택</button>
+    </article>
+  `).join('');
 
-    function saveEntries(entries) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-    }
-
-    function renderSavedItems() {
-      const container = document.getElementById('savedItems');
-      const entries = getEntries();
-      if (!entries.length) {
-        container.innerHTML = '<div class="result-line muted-note">아직 저장된 기록이 없습니다.</div>';
-        return;
-      }
-      container.innerHTML = entries.slice().reverse().map((entry) => `
-        <article class="saved-item">
-          <strong>${escapeHtml(entry.title)}</strong>
-          <div class="preview-meta" style="margin:0 0 8px;">
-            <span class="tag">${escapeHtml(entry.date)}</span>
-            <span class="tag">${escapeHtml(entry.emotion)}</span>
-            <span class="tag">${escapeHtml(entry.visibility)}</span>
-          </div>
-          <div class="muted-note" style="white-space:pre-wrap;">${escapeHtml(entry.content.slice(0, 180))}${entry.content.length > 180 ? '...' : ''}</div>
-        </article>
-      `).join('');
-    }
-
-    document.getElementById('saveBtn').addEventListener('click', () => {
-      const data = buildPreviewData();
-      const entries = getEntries();
-      entries.push(data);
-      saveEntries(entries);
-      renderSavedItems();
-      renderPreview();
-      alert('기록이 현재 기기에 저장되었어요.');
+  helper.querySelectorAll('.variant-card').forEach((card) => {
+    card.addEventListener('click', () => {
+      helper.querySelectorAll('.variant-card').forEach((item) => item.classList.remove('selected'));
+      card.classList.add('selected');
+      state.selectedVariant = state.currentVariants[Number(card.dataset.variantIndex)]?.text || '';
     });
+  });
+}
 
-    const harshPatterns = [
-      [/씨발+|시발+|ㅅㅂ+|ㅂㅅ+|병신+|좆같+|존나+|개같+|개빡+|개열받+|꺼져+|미친놈+|미쳤냐+|돌았냐+/gi, ''],
-      [/개답답|개노답|답이 없네|답없네/gi, '많이 답답했다'],
-      [/열받|빡치|빡침|화남|환장/gi, '감정이 크게 올라왔다'],
-      [/망했|말아먹|터졌네/gi, '흐름이 무너졌다'],
-      [/못하네|못하냐|못하냐고|왜 이래/gi, '경기력이 아쉬웠다'],
-      [/최악/gi, '많이 아쉬운 경기였다'],
-      [/어이없|황당/gi, '이해하기 어려웠다'],
-      [/ㅋㅋ+|ㅎ+/g, ' ']
-    ];
+async function runSoften() {
+  const original = el('toneInput').value.trim();
+  if (!original) {
+    renderVariants('', [], '');
+    return;
+  }
 
-    const topicMap = [
-      { keys: ['감독', '교체', '라인업', '작전'], subject: '작전 선택', detail: '운영 타이밍' },
-      { keys: ['불펜', '투수', '볼배합', '제구', '사사구'], subject: '투수 운영', detail: '볼배합과 제구' },
-      { keys: ['수비', '실책', '송구', '포구'], subject: '수비 집중력', detail: '수비 처리' },
-      { keys: ['타선', '타격', '삼진', '득점권', '찬스'], subject: '타선 연결', detail: '득점 기회 처리' },
-      { keys: ['주루', '도루', '베이스러닝'], subject: '주루 판단', detail: '베이스러닝 선택' },
-      { keys: ['심판', '판정', '비디오판독'], subject: '판정 이해', detail: '판정 기준' }
-    ];
+  if (state.softenMode === 'local') {
+    renderVariants(original, buildLocalVariants(original), '로컬 순화 결과');
+    return;
+  }
 
-    function detectTopic(text) {
-      const found = topicMap.find((topic) => topic.keys.some((key) => text.includes(key)));
-      return found || { subject: '경기 흐름', detail: '흐름 관리' };
-    }
+  try {
+    const variants = await buildGPTVariants(original);
+    renderVariants(original, variants, 'GPT 순화 결과');
+  } catch {
+    renderVariants(original, buildLocalVariants(original), 'GPT 연결에 실패해 로컬 순화로 대신 보여줘요');
+  }
+}
 
-    function normalizeSentence(text) {
-      let result = text.trim();
-      harshPatterns.forEach(([pattern, replacement]) => {
-        result = result.replace(pattern, replacement);
-      });
-      result = result
-        .replace(/\s{2,}/g, ' ')
-        .replace(/[!~]+/g, '')
-        .replace(/[?]{2,}/g, '?')
-        .trim();
-      return result;
-    }
+function useSelectedVariant() {
+  if (!state.selectedVariant) return;
+  if (state.mode === 'template') {
+    const current = el('sadScene').value.trim();
+    el('sadScene').value = current ? `${current}\n${state.selectedVariant}` : state.selectedVariant;
+  } else {
+    const current = el('freeText').value.trim();
+    el('freeText').value = current ? `${current}\n${state.selectedVariant}` : state.selectedVariant;
+  }
+}
 
-    function buildLocalVariants(originalText) {
-      const raw = originalText.trim();
-      if (!raw) return [];
-      const clean = normalizeSentence(raw);
-      const topic = detectTopic(raw);
-      const hasStrongEmotion = /씨발|시발|개|열받|빡치|존나|좆|병신|노답/i.test(raw);
-      const detailLine = clean && clean !== raw ? clean : `${topic.detail} 부분이 특히 아쉬웠다`;
+function saveRecord() {
+  const preview = buildPreviewData();
+  const entries = getEntries();
+  entries.push(preview);
+  saveEntries(entries);
+  renderSavedItems();
+  renderPreview();
+  alert('기록이 현재 기기에 저장되었어요.');
+}
 
-      const variants = [
-        {
-          label: '차분하게',
-          text: `오늘 ${topic.subject} 부분이 많이 아쉬웠고, 감정이 크게 올라온 경기였다. ${detailLine.endsWith('.') ? detailLine : detailLine + '.'}`
-        },
-        {
-          label: '기록형',
-          text: `오늘 경기를 기록해두면 ${topic.subject}에서 흐름을 내준 장면이 크게 남는다. ${detailLine.endsWith('.') ? detailLine : detailLine + '.'}`
-        },
-        {
-          label: '분석형',
-          text: `정리하면 ${topic.subject} 쪽에서 개선이 필요해 보였다. ${hasStrongEmotion ? '순간적으로 감정이 올라올 만한 장면이었다.' : '아쉬움이 남는 장면이었다.'}`
-        }
-      ];
+function initMyTeamEvents() {
+  el('myTeamSelect').addEventListener('change', (e) => {
+    const team = e.target.value;
+    el('team').value = team;
+    updateOpponentOptions(team);
+  });
 
-      return variants.map((item) => ({ ...item, text: item.text.replace(/\s{2,}/g, ' ').trim() }));
-    }
+  el('saveMyTeamBtn').addEventListener('click', () => {
+    state.myTeam = el('myTeamSelect').value;
+    state.nickname = el('myNickname').value.trim();
+    saveSettings({ myTeam: state.myTeam, nickname: state.nickname });
+    applySettingsToUI();
+    renderStandings(state.dashboard.standings);
+    renderMyTeamGames();
+  });
 
-    async function buildAIVariants(originalText) {
-      const response = await fetch('/api/soften', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: originalText,
-          tone: 'baseball_journal',
-          variants: ['차분하게', '기록형', '분석형']
-        })
-      });
-      if (!response.ok) throw new Error('AI 순화 실패');
-      const data = await response.json();
-      if (!Array.isArray(data.variants)) throw new Error('AI 응답 형식 오류');
-      return data.variants;
-    }
+  el('resetMyTeamBtn').addEventListener('click', () => {
+    state.myTeam = '';
+    state.nickname = '';
+    saveSettings({});
+    applySettingsToUI();
+    renderStandings(state.dashboard.standings);
+    renderMyTeamGames();
+  });
+}
 
-    function renderVariants(original, variants, sourceLabel) {
-      const helperResult = document.getElementById('helperResult');
-      if (!original.trim()) {
-        helperResult.innerHTML = '<div class="result-line">문장을 먼저 입력해 주세요.</div>';
-        currentVariants = [];
-        selectedVariant = '';
-        return;
-      }
-      currentVariants = variants;
-      selectedVariant = variants[0]?.text || '';
-      helperResult.innerHTML = `
-        <div class="result-line">
-          <strong>원문</strong>
-          <div>${escapeHtml(original)}</div>
-          <div class="small-note" style="margin-top:8px;">${escapeHtml(sourceLabel)}</div>
-        </div>
-      ` + variants.map((variant, index) => `
-        <button class="variant-card" type="button" data-variant-index="${index}" style="text-align:left; cursor:pointer; ${index === 0 ? 'border-color: rgba(89,195,255,0.34); background: rgba(89,195,255,0.08);' : ''}">
-          <strong>${escapeHtml(variant.label)}</strong>
-          <div>${escapeHtml(variant.text)}</div>
-        </button>
-      `).join('');
+function initCoreEvents() {
+  el('team').addEventListener('change', (e) => updateOpponentOptions(e.target.value));
+  el('refreshDashboardBtn').addEventListener('click', loadDashboard);
+  el('previewBtn').addEventListener('click', renderPreview);
+  el('saveBtn').addEventListener('click', saveRecord);
+  el('softenBtn').addEventListener('click', runSoften);
+  el('useSoftenedBtn').addEventListener('click', useSelectedVariant);
+}
 
-      helperResult.querySelectorAll('[data-variant-index]').forEach((button) => {
-        button.addEventListener('click', () => {
-          helperResult.querySelectorAll('[data-variant-index]').forEach((item) => {
-            item.style.borderColor = 'rgba(255,255,255,0.08)';
-            item.style.background = 'rgba(255,255,255,0.045)';
-          });
-          button.style.borderColor = 'rgba(89,195,255,0.34)';
-          button.style.background = 'rgba(89,195,255,0.08)';
-          const idx = Number(button.dataset.variantIndex);
-          selectedVariant = currentVariants[idx]?.text || '';
-        });
-      });
-    }
+function init() {
+  const settings = getSettings();
+  state.myTeam = settings.myTeam || '';
+  state.nickname = settings.nickname || '';
+  populateTeamSelects();
+  applySettingsToUI();
+  bindEmotionButtons();
+  bindModeButtons();
+  bindSoftenTabs();
+  initMyTeamEvents();
+  initCoreEvents();
+  renderSavedItems();
+  loadDashboard();
+}
 
-    document.getElementById('softenBtn').addEventListener('click', async () => {
-      const input = document.getElementById('toneInput').value;
-      if (!input.trim()) {
-        renderVariants('', []);
-        return;
-      }
-      if (softenMode === 'ai') {
-        try {
-          const variants = await buildAIVariants(input);
-          renderVariants(input, variants, 'GPT 순화 결과');
-          return;
-        } catch (error) {
-          const variants = buildLocalVariants(input);
-          renderVariants(input, variants, 'GPT 연동이 없어 로컬 순화로 대체됨');
-          return;
-        }
-      }
-      const variants = buildLocalVariants(input);
-      renderVariants(input, variants, '로컬 순화 결과');
-    });
-
-    document.getElementById('useSoftenedBtn').addEventListener('click', () => {
-      if (!selectedVariant) return;
-      if (currentMode === 'freeform') {
-        const freeText = document.getElementById('freeText');
-        freeText.value = `${freeText.value.trim()}${freeText.value.trim() ? '\n\n' : ''}${selectedVariant}`;
-      } else {
-        const sadScene = document.getElementById('sadScene');
-        sadScene.value = `${sadScene.value.trim()}${sadScene.value.trim() ? '\n\n' : ''}${selectedVariant}`;
-      }
-    });
-
-    const ruleData = {
-      basic: {
-        title: '기본 룰',
-        lead: '기본은 타구가 어디에 떨어졌는지를 먼저 보면 돼요. 선 안쪽인지, 내야인지, 담장을 넘는지가 핵심입니다.',
-        cards: [
-          { title: '페어볼', desc: '1루선과 3루선 안쪽, 또는 선 위에 떨어지면 페어예요. 선 위는 파울이 아니라 페어로 봅니다.' },
-          { title: '파울볼', desc: '타구가 파울선 바깥쪽에 떨어지거나 바깥으로 굴러가면 파울이에요. 그 순간 공은 살아 있지 않아요.' },
-          { title: '내야땅볼', desc: '타구가 땅에 먼저 닿고 내야에서 처리되는 형태예요. 빠르면 내야안타가 될 수도 있고, 병살로 이어질 수도 있어요.' },
-          { title: '홈런', desc: '페어 지역으로 날아간 타구가 담장을 넘어가면 홈런이에요. 파울 폴 안쪽을 지나가야 인정됩니다.' }
-        ]
-      },
-      intermediate: {
-        title: '중급 룰',
-        lead: '기본 위치 감각이 잡히면, 주자 상황과 아웃 방식도 같이 이해하면 경기가 훨씬 재밌어져요.',
-        cards: [
-          { title: '포스아웃', desc: '다음 베이스로 반드시 가야 하는 주자는 베이스만 밟아도 아웃이 됩니다.' },
-          { title: '태그아웃', desc: '의무 진루가 없는 주자는 수비가 공을 든 채 직접 태그해야 아웃이 돼요.' },
-          { title: '희생플라이', desc: '외야 플라이 아웃 뒤 주자가 태그업해서 홈에 들어오면 득점이 인정됩니다.' },
-          { title: '병살', desc: '한 플레이에서 아웃 두 개를 잡는 수비예요. 내야땅볼에서 자주 나옵니다.' }
-        ]
-      },
-      advanced: {
-        title: '심화 룰 / 기록',
-        lead: '야구를 조금 더 깊게 보려면 판정, 운영, 기록 지표까지 같이 보는 게 좋아요.',
-        cards: [
-          { title: '인필드 플라이', desc: '주자를 속이는 고의 낙구를 막기 위해 특정 상황에서 자동 아웃을 선언하는 규정이에요.' },
-          { title: '보크', desc: '투수가 주자를 속이는 부정 동작을 하면 주자가 한 베이스씩 진루합니다.' },
-          { title: 'OPS', desc: '출루율과 장타율을 더한 값으로 타자의 공격 기여를 빠르게 보는 대표 지표예요.' },
-          { title: 'WHIP', desc: '투수 1이닝당 허용한 주자 수를 보는 지표로, 투수 안정감을 확인할 때 자주 봅니다.' }
-        ]
-      }
-    };
-
-    function renderRules(tab) {
-      const data = ruleData[tab];
-      document.getElementById('ruleTitle').textContent = data.title;
-      document.getElementById('ruleLead').textContent = data.lead;
-      document.getElementById('ruleCards').innerHTML = data.cards.map((card) => `
-        <article class="rule-card">
-          <strong>${escapeHtml(card.title)}</strong>
-          <span>${escapeHtml(card.desc)}</span>
-        </article>
-      `).join('');
-    }
-
-    document.querySelectorAll('#ruleTabs button').forEach((button) => {
-      button.addEventListener('click', () => {
-        document.querySelectorAll('#ruleTabs button').forEach((btn) => btn.classList.remove('active'));
-        button.classList.add('active');
-        renderRules(button.dataset.tab);
-      });
-    });
-
-    const scenarios = {
-      fair: {
-        label: '페어볼',
-        landing: { x: 228, y: 175 },
-        curve1: { x: 200, y: 255 },
-        curve2: { x: 215, y: 215 },
-        badge: '페어',
-        legend: [
-          ['판정', '파울선 안쪽으로 떨어지면 페어예요.'],
-          ['보는 포인트', '선 안쪽 / 선 위 / 외야 페어 지역'],
-          ['왜 중요한지', '안타, 장타, 수비 처리 모두 이어질 수 있어요.']
-        ]
-      },
-      foul: {
-        label: '파울볼',
-        landing: { x: 88, y: 206 },
-        curve1: { x: 142, y: 248 },
-        curve2: { x: 112, y: 220 },
-        badge: '파울',
-        legend: [
-          ['판정', '파울선 바깥쪽으로 떨어지면 파울이에요.'],
-          ['보는 포인트', '선 바깥 낙하지점'],
-          ['왜 중요한지', '공이 살아 있지 않아서 주자 진루나 수비 플레이가 이어지지 않아요.']
-        ]
-      },
-      grounder: {
-        label: '내야땅볼',
-        landing: { x: 190, y: 250 },
-        curve1: { x: 184, y: 278 },
-        curve2: { x: 188, y: 264 },
-        badge: '내야',
-        legend: [
-          ['판정', '공이 내야 쪽 땅에 먼저 닿고 굴러가면 내야땅볼로 이해하면 쉬워요.'],
-          ['보는 포인트', '낙하지점이 내야 흙 근처인지'],
-          ['왜 중요한지', '송구 속도에 따라 내야안타, 포스아웃, 병살이 갈립니다.']
-        ]
-      },
-      homerun: {
-        label: '홈런',
-        landing: { x: 190, y: 72 },
-        curve1: { x: 206, y: 220 },
-        curve2: { x: 212, y: 120 },
-        badge: '홈런',
-        legend: [
-          ['판정', '페어 지역으로 날아가 담장을 넘어가면 홈런이에요.'],
-          ['보는 포인트', '파울 폴 안쪽 + 담장 너머'],
-          ['왜 중요한지', '땅에 떨어지기 전에 담장을 넘으면 가장 강한 타구 결과가 됩니다.']
-        ]
-      }
-    };
-
-    const movingBall = document.getElementById('movingBall');
-    const ballShadow = document.getElementById('ballShadow');
-    const flightPath = document.getElementById('flightPath');
-    const landingPoint = document.getElementById('landingPoint');
-    const landingLabel = document.getElementById('landingLabel');
-
-    function cubicBezierPoint(t, p0, p1, p2, p3) {
-      const mt = 1 - t;
-      const x = (mt ** 3) * p0.x + 3 * (mt ** 2) * t * p1.x + 3 * mt * (t ** 2) * p2.x + (t ** 3) * p3.x;
-      const y = (mt ** 3) * p0.y + 3 * (mt ** 2) * t * p1.y + 3 * mt * (t ** 2) * p2.y + (t ** 3) * p3.y;
-      return { x, y };
-    }
-
-    function animateScenario(key) {
-      if (animationFrame) cancelAnimationFrame(animationFrame);
-      const scenario = scenarios[key];
-      const start = { x: 180, y: 300 };
-      const p1 = scenario.curve1;
-      const p2 = scenario.curve2;
-      const end = scenario.landing;
-      flightPath.setAttribute('d', `M ${start.x} ${start.y} C ${p1.x} ${p1.y}, ${p2.x} ${p2.y}, ${end.x} ${end.y}`);
-      landingPoint.setAttribute('cx', end.x);
-      landingPoint.setAttribute('cy', end.y);
-      landingLabel.setAttribute('x', end.x + 8);
-      landingLabel.setAttribute('y', end.y - 8);
-      landingLabel.textContent = scenario.badge;
-      document.getElementById('fieldLegend').innerHTML = scenario.legend.map(([label, value]) => `
-        <div class="mini-stat"><span>${escapeHtml(label)}</span><span>${escapeHtml(value)}</span></div>
-      `).join('');
-
-      const duration = 1800;
-      const startTime = performance.now();
-      function step(now) {
-        const elapsed = now - startTime;
-        const t = Math.min(elapsed / duration, 1);
-        const eased = 1 - Math.pow(1 - t, 3);
-        const point = cubicBezierPoint(eased, start, p1, p2, end);
-        movingBall.setAttribute('cx', point.x);
-        movingBall.setAttribute('cy', point.y);
-        ballShadow.setAttribute('cx', point.x);
-        ballShadow.setAttribute('cy', point.y + 2);
-        if (t < 1) {
-          animationFrame = requestAnimationFrame(step);
-        }
-      }
-      animationFrame = requestAnimationFrame(step);
-    }
-
-    document.querySelectorAll('.scenario-btn').forEach((button) => {
-      button.addEventListener('click', () => {
-        document.querySelectorAll('.scenario-btn').forEach((btn) => btn.classList.remove('active'));
-        button.classList.add('active');
-        animateScenario(button.dataset.scenario);
-      });
-    });
-
-    renderRules('basic');
-    renderSavedItems();
-    renderDashboard(demoDashboard);
-    loadDashboard();
-    animateScenario('fair');
+init();
