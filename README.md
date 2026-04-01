@@ -1,28 +1,34 @@
-# 야구노트 웹앱
+# Baseball Note Mobile
 
-마이팀 중심으로 경기 결과를 보고, GPT 욕 순화 도우미와 줄글 기록 미리보기를 쓸 수 있는 모바일 친화 웹앱입니다.
+모바일 우선으로 만든 KBO 팬 기록 웹앱입니다.
 
 ## 포함 기능
-- 마이팀 설정 및 브라우저 저장
-- 마이팀 경기만 필터링해서 표시
-- GPT 욕 순화 API (`/api/soften`)
-- GPT 미연결 시 로컬 순화 fallback
-- 템플릿 / 자유양식 기록 작성
-- 기록 미리보기를 자연스러운 줄글 회고 형태로 생성
+- 마이팀 설정
+- 마이팀 경기만 표시
+- 최근 5경기 / 최근 10경기 전환
+- KBO 공식 사이트(영문 공식 페이지 포함) 기준 경기/순위 불러오기
+- GPT 욕 순화 도우미
+- 템플릿 / 자유 기록 작성
+- 기록 미리보기 줄글 생성
+- 라이트 / 나이트 모드
+- 구단별 키 컬러 적용
 
-## 로컬 실행
-정적 파일만 볼 때는 `index.html`을 열면 됩니다.
+## 실행
+```bash
+npm install
+```
 
-## Vercel 배포
-1. GitHub에 업로드
-2. Vercel에서 저장소 Import
-3. 환경변수 추가
-   - `OPENAI_API_KEY`
-4. 재배포
+로컬 정적 실행은 아무 서버로 가능하지만, API 라우트 때문에 Vercel 배포를 권장합니다.
 
-## 파일 구조
-- `index.html` : 메인 화면
-- `styles.css` : 스타일
-- `app.js` : 프론트 로직
-- `api/soften.js` : GPT 욕 순화 API
-- `api/kbo-dashboard.js` : 경기/순위 샘플 API
+## Vercel 환경변수
+- `OPENAI_API_KEY`
+
+## 배포
+1. GitHub 저장소에 업로드
+2. Vercel에서 저장소 import
+3. Environment Variables에 `OPENAI_API_KEY` 추가
+4. Redeploy
+
+## 참고
+- KBO 폰트는 공식 페이지에서 배포되는 `KBO 다이아고딕`을 기준으로 `local()` 우선 적용했습니다.
+- 실제 렌더링은 사용자 환경에 폰트가 설치되어 있거나, 추후 직접 웹폰트 파일을 연결하면 가장 안정적입니다.

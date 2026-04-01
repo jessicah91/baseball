@@ -2,264 +2,176 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>야구노트</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b0d12" />
+  <title>덕아웃 노트</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="wrap topbar-inner">
-      <div class="brand">
-        <div class="brand-badge">⚾</div>
-        <div>
-          <h1>야구노트</h1>
-          <p>욕 대신 기록이 남는 야구 공간</p>
-        </div>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">MOBILE FIRST KBO NOTE</p>
+        <h1>덕아웃 노트</h1>
       </div>
-      <a class="pill" href="#record">기록하러 가기</a>
-    </div>
-  </header>
+      <button id="themeToggle" class="ghost-btn" aria-label="테마 전환">나이트</button>
+    </header>
 
-  <main class="wrap app-shell">
-    <section class="hero card">
-      <div class="eyebrow">모바일 친화 · 마이팀 중심 · GPT 욕 순화 · 기록 미리보기</div>
-      <h2>내 팀 경기만 보고, 감정은 정리해서 기록하는 야구 웹앱</h2>
-      <p>
-        먼저 마이팀을 설정하고, 그 팀 경기 결과만 보면서 기록을 남겨보세요.
-        거친 표현은 GPT 순화 도우미로 다듬고, 마지막에는 자연스러운 줄글 회고로 미리볼 수 있어요.
-      </p>
-      <div class="hero-actions">
-        <a class="btn btn-primary" href="#myteam">마이팀 설정</a>
-        <a class="btn btn-secondary" href="#scoreboard">내 팀 경기 보기</a>
-      </div>
-    </section>
-
-    <section class="section" id="myteam">
-      <div class="section-title">
-        <div>
-          <h2>마이팀 설정</h2>
-          <p>한 번 고르면 저장되고, 오늘 경기와 기록 화면이 그 팀 기준으로 바뀌어요.</p>
+    <main class="content">
+      <section class="hero-card accent-border">
+        <div class="hero-copy">
+          <p class="eyebrow">욕 대신 기록</p>
+          <h2><span id="heroTeam">LG</span> 팬의 오늘을 남기는 방식</h2>
+          <p>
+            마이팀 기준으로 경기와 순위를 보고, 감정은 정리해서 기록으로 남겨요.
+          </p>
         </div>
-      </div>
-
-      <div class="card myteam-card">
-        <div class="field-group compact-grid">
-          <div class="field">
-            <label for="myTeamSelect">응원 팀</label>
-            <select id="myTeamSelect"></select>
-          </div>
-          <div class="field">
-            <label for="myNickname">기록자 이름</label>
-            <input id="myNickname" type="text" placeholder="예: 9회말덕후" maxlength="20" />
-          </div>
+        <div class="hero-actions">
+          <button class="primary-btn" data-scroll="recordSection">바로 기록하기</button>
+          <button class="ghost-btn" data-scroll="gamesSection">최근 경기 보기</button>
         </div>
-        <div class="action-row">
-          <button class="btn btn-primary" id="saveMyTeamBtn">마이팀 저장</button>
-          <button class="btn btn-secondary" id="resetMyTeamBtn">초기화</button>
-        </div>
-        <div id="myTeamSummary" class="myteam-summary">아직 마이팀이 설정되지 않았어요.</div>
-      </div>
-    </section>
+      </section>
 
-    <section class="section" id="scoreboard">
-      <div class="section-title">
-        <div>
-          <h2>내 팀 경기 결과</h2>
-          <p>마이팀이 포함된 경기만 보여줘서 보기 쉽게 정리했어요.</p>
-        </div>
-      </div>
-
-      <div class="card-grid-2">
-        <article class="card">
-          <div class="status-banner">
+      <section class="settings-grid">
+        <article class="panel accent-border">
+          <div class="panel-head">
             <div>
-              <div class="badge-row">
-                <span class="tag info" id="dataModeTag">데모 모드</span>
-                <span class="tag" id="lastUpdatedTag">업데이트 정보 없음</span>
-              </div>
-              <p id="dashboardStatus">마이팀을 선택하면 해당 팀 경기만 따로 보여줘요. API가 연결되면 실제 데이터로 바뀌도록 준비돼 있어요.</p>
+              <p class="eyebrow">MY TEAM</p>
+              <h3>마이팀 설정</h3>
             </div>
-            <button class="btn btn-secondary" id="refreshDashboardBtn">새로 불러오기</button>
           </div>
-
-          <div class="score-box">
-            <h4>오늘 / 최근 내 팀 경기</h4>
-            <div id="myTeamGamesList" class="games-list"></div>
-          </div>
+          <label class="field-label" for="myTeamSelect">응원 구단</label>
+          <select id="myTeamSelect" class="select-field"></select>
+          <p class="muted">설정한 구단에 따라 키 컬러와 메인 경기 정보가 바뀝니다.</p>
         </article>
 
-        <aside class="card">
-          <div class="score-box">
-            <h4>기록 폼에 바로 채우기</h4>
-            <p>내 팀 경기 하나를 선택하면 아래 기록 폼의 날짜, 상대팀, 경기결과가 자동으로 들어가요.</p>
-            <div class="field">
-              <label for="gameQuickSelect">내 팀 경기 선택</label>
-              <select id="gameQuickSelect">
-                <option value="">내 팀 경기를 먼저 불러와 주세요</option>
-              </select>
-            </div>
-            <div class="standings-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>순위</th>
-                    <th>팀</th>
-                    <th>승</th>
-                    <th>패</th>
-                    <th>무</th>
-                    <th>승률</th>
-                    <th>게임차</th>
-                  </tr>
-                </thead>
-                <tbody id="standingsBody"></tbody>
-              </table>
+        <article class="panel accent-border">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">VIEW MODE</p>
+              <h3>최근 경기 범위</h3>
             </div>
           </div>
-        </aside>
-      </div>
-    </section>
-
-    <section class="section" id="record">
-      <div class="section-title">
-        <div>
-          <h2>경기 기록하기</h2>
-          <p>템플릿과 자유양식 중 편한 방식으로 쓰고, 마지막엔 줄글 회고로 정리해보세요.</p>
-        </div>
-      </div>
-
-      <div class="panel-grid">
-        <article class="card">
-          <div class="fields">
-            <div class="row-3">
-              <div class="field">
-                <label for="team">응원 팀</label>
-                <select id="team"></select>
-              </div>
-              <div class="field">
-                <label for="opponent">상대 팀</label>
-                <select id="opponent"></select>
-              </div>
-              <div class="field">
-                <label for="gameDate">경기 날짜</label>
-                <input id="gameDate" type="date" />
-              </div>
-            </div>
-
-            <div class="row-2">
-              <div class="field">
-                <label for="visibility">공개 범위</label>
-                <select id="visibility">
-                  <option>나만 보기</option>
-                  <option>공개 기록</option>
-                  <option>팀 팬과 공유</option>
-                </select>
-              </div>
-              <div class="field">
-                <label for="gameResultMemo">경기 결과 / 메모</label>
-                <input id="gameResultMemo" type="text" placeholder="예: LG 7 : 2 KIA / 8회 불펜이 버텨줌" />
-              </div>
-            </div>
-
-            <div>
-              <label class="sub-label">작성 방식</label>
-              <div class="mode-row">
-                <button class="pill active mode-toggle" data-mode="template" type="button">템플릿으로 쓰기</button>
-                <button class="pill mode-toggle" data-mode="freeform" type="button">자유양식으로 쓰기</button>
-              </div>
-            </div>
-
-            <div>
-              <label class="sub-label">오늘의 감정</label>
-              <div class="emotion-row" id="emotionRow">
-                <button class="pill emotion active" type="button">답답했음</button>
-                <button class="pill emotion" type="button">재밌었음</button>
-                <button class="pill emotion" type="button">희망 봄</button>
-                <button class="pill emotion" type="button">아쉬움 큼</button>
-                <button class="pill emotion" type="button">미쳤다</button>
-              </div>
-            </div>
-
-            <div id="templateFields" class="fields">
-              <div class="field">
-                <label for="summary">오늘 경기 한줄 요약</label>
-                <input id="summary" type="text" placeholder="예: 후반 집중력 덕분에 분위기를 가져온 경기" />
-              </div>
-              <div class="field">
-                <label for="bestScene">가장 좋았던 장면</label>
-                <textarea id="bestScene" placeholder="오늘 가장 인상 깊었던 타격, 수비, 투구 장면"></textarea>
-              </div>
-              <div class="field">
-                <label for="sadScene">가장 아쉬웠던 장면</label>
-                <textarea id="sadScene" placeholder="답답했던 운영, 실책, 작전 등을 적어보세요"></textarea>
-              </div>
-              <div class="field">
-                <label for="confusingRule">이해 안 갔던 룰 / 판정</label>
-                <textarea id="confusingRule" placeholder="판정이나 작전 중 다시 보고 싶은 부분"></textarea>
-              </div>
-              <div class="field">
-                <label for="nextGame">다음 경기에서 보고 싶은 점</label>
-                <textarea id="nextGame" placeholder="다음 경기 기대 포인트"></textarea>
-              </div>
-            </div>
-
-            <div id="freeformField" class="field hidden">
-              <label for="freeText">자유 기록</label>
-              <textarea id="freeText" placeholder="오늘 경기를 자유롭게 기록해보세요." style="min-height: 260px"></textarea>
-            </div>
-
-            <div class="action-row">
-              <button class="btn btn-primary" id="previewBtn">줄글 미리보기 만들기</button>
-              <button class="btn btn-secondary" id="saveBtn">내 기기에 저장</button>
-            </div>
+          <div class="segmented" id="recentRangeTabs">
+            <button class="segmented-btn active" data-limit="5">최근 5경기</button>
+            <button class="segmented-btn" data-limit="10">최근 10경기</button>
           </div>
+          <p class="muted">마이팀 경기만 공식 KBO 기준으로 불러옵니다.</p>
+        </article>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="panel large accent-border" id="todayPanel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">TODAY</p>
+              <h3>오늘의 마이팀 경기</h3>
+            </div>
+            <span class="pill" id="todayStatus">불러오는 중</span>
+          </div>
+          <div id="todayGameCard" class="game-focus skeleton-block"></div>
         </article>
 
-        <aside class="card side-stack">
-          <div class="helper-box">
-            <h4>GPT 욕 순화 도우미</h4>
-            <p>거칠게 적은 문장을 회고용 문장으로 바꿔줘요. API 키를 넣어두면 GPT로, 없으면 로컬 순화로 동작해요.</p>
-            <div class="helper-tabs" id="softenTabs">
-              <button class="active" data-soften="gpt" type="button">GPT 순화</button>
-              <button data-soften="local" type="button">로컬 순화</button>
+        <article class="panel accent-border" id="standingPanel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">RANK</p>
+              <h3>마이팀 순위</h3>
             </div>
-            <div class="field">
-              <label for="toneInput">거칠게 적기</label>
-              <textarea id="toneInput" placeholder="예: 오늘 불펜 진짜 개열받았고 감독 교체 타이밍도 왜 저랬는지 모르겠음"></textarea>
-            </div>
-            <div class="helper-actions">
-              <button class="btn btn-primary" id="softenBtn">순화 문장 만들기</button>
-              <button class="btn btn-secondary" id="useSoftenedBtn">선택 문장 기록에 넣기</button>
-            </div>
-            <div class="small-note" id="softenModeNote">기본은 GPT 우선이며, 서버 설정이 없으면 자동으로 로컬 순화 결과를 보여줘요.</div>
-            <div class="variant-list" id="helperResult"></div>
           </div>
+          <div id="myStandingCard" class="standing-focus skeleton-block"></div>
+        </article>
+      </section>
 
-          <div class="preview-box">
+      <section class="panel accent-border" id="gamesSection">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">RECENT</p>
+            <h3>마이팀 최근 경기</h3>
+          </div>
+        </div>
+        <div id="recentGamesList" class="games-list"></div>
+      </section>
+
+      <section class="panel accent-border" id="recordSection">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">WRITE</p>
+            <h3>오늘의 기록</h3>
+          </div>
+        </div>
+
+        <div class="segmented mode-tabs" id="writeModeTabs">
+          <button class="segmented-btn active" data-mode="template">템플릿</button>
+          <button class="segmented-btn" data-mode="free">자유 양식</button>
+        </div>
+
+        <div id="templateFields" class="form-grid">
+          <div class="field">
+            <label for="feeling">오늘의 감정</label>
+            <select id="feeling" class="select-field">
+              <option>답답했음</option>
+              <option>희망이 보였음</option>
+              <option>재밌었음</option>
+              <option>화났음</option>
+              <option>아쉽지만 볼 건 있었음</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="oneLine">한 줄 요약</label>
+            <input id="oneLine" type="text" placeholder="예: 불펜 흔들렸지만 타선 집중력은 좋았음" />
+          </div>
+          <div class="field full">
+            <label for="goodPoint">좋았던 장면</label>
+            <textarea id="goodPoint" rows="3" placeholder="좋았던 플레이나 선수"></textarea>
+          </div>
+          <div class="field full">
+            <label for="badPoint">아쉬웠던 장면</label>
+            <textarea id="badPoint" rows="3" placeholder="욕을 써도 아래에서 순화할 수 있게 도와줄게"></textarea>
+          </div>
+          <div class="field full">
+            <label for="nextPoint">다음 경기에서 보고 싶은 점</label>
+            <textarea id="nextPoint" rows="3" placeholder="예: 초반 실점 줄이기, 주루 판단 안정화"></textarea>
+          </div>
+        </div>
+
+        <div id="freeFields" class="form-grid hidden">
+          <div class="field full">
+            <label for="freeNote">자유 기록</label>
+            <textarea id="freeNote" rows="8" placeholder="감정적으로 적어도 괜찮아. 아래에서 기록용 문장으로 정리해줄게."></textarea>
+          </div>
+        </div>
+
+        <div class="tool-row">
+          <button id="softenBtn" class="primary-btn">GPT로 욕 순화하기</button>
+          <button id="previewBtn" class="ghost-btn">줄글 미리보기 만들기</button>
+        </div>
+
+        <div class="response-grid">
+          <article class="response-card">
+            <p class="eyebrow">SOFTENED</p>
+            <h4>순화 결과</h4>
+            <div id="softenResult" class="response-body muted">아직 정리된 문장이 없어요.</div>
+          </article>
+          <article class="response-card">
+            <p class="eyebrow">PREVIEW</p>
             <h4>기록 미리보기</h4>
-            <p>사용자가 적은 내용을 자연스러운 줄글 회고로 정리해서 보여줘요.</p>
-            <div id="previewArea" class="preview-card">
-              <div class="preview-meta">
-                <span class="tag">아직 미리보기가 없어요</span>
-              </div>
-              <div class="content">왼쪽에서 내용을 입력한 뒤 줄글 미리보기를 눌러보세요.</div>
-            </div>
-          </div>
-        </aside>
-      </div>
-    </section>
-
-    <section class="section" id="savedSection">
-      <div class="section-title">
-        <div>
-          <h2>내가 저장한 기록</h2>
-          <p>브라우저에 저장된 기록을 간단히 다시 볼 수 있어요.</p>
+            <div id="previewResult" class="response-body muted">버튼을 누르면 사용자가 적은 내용을 자연스러운 회고문으로 정리해줘요.</div>
+          </article>
         </div>
-      </div>
-      <div class="card">
-        <div id="savedItems" class="saved-list"></div>
-      </div>
-    </section>
-  </main>
+      </section>
+
+      <section class="panel accent-border">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">STANDINGS</p>
+            <h3>전체 순위</h3>
+          </div>
+        </div>
+        <div id="standingsTable" class="standings-table"></div>
+      </section>
+    </main>
+  </div>
 
   <script src="app.js"></script>
 </body>
