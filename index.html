@@ -23,7 +23,7 @@
         <div class="hero-copy">
           <p class="eyebrow">MY TEAM BOARD</p>
           <h2><span id="heroTeam">LG</span> 팬의 오늘을 더 매끄럽게</h2>
-          <p>마이팀 경기, 순위, 기록 작성, 감정 정리를 한 화면에 담은 모바일 홈.</p>
+          <p>마이팀 경기, 순위, 최근 경기 달력, 기록 작성까지 한 화면에서 정리해요.</p>
         </div>
         <div class="hero-actions">
           <button class="primary-btn" data-scroll="recordSection">기록하기</button>
@@ -41,7 +41,7 @@
           </div>
           <label class="field-label" for="myTeamSelect">응원 구단</label>
           <select id="myTeamSelect" class="select-field"></select>
-          <p class="muted">키 컬러가 구단에 맞춰 자연스럽게 바뀌고, 메인 홈도 같이 바뀝니다.</p>
+          <p class="muted">배경은 화이트/나이트만 유지하고, 키 컬러만 구단에 맞춰 바뀌어요.</p>
         </article>
 
         <article class="panel accent-border">
@@ -55,7 +55,7 @@
             <button class="segmented-btn active" data-limit="5">최근 5경기</button>
             <button class="segmented-btn" data-limit="10">최근 10경기</button>
           </div>
-          <p class="muted">KBO 기준 마이팀 경기만 보입니다.</p>
+          <p class="muted">마이팀 경기만 날짜순 달력으로 보여줘요.</p>
         </article>
       </section>
 
@@ -99,6 +99,10 @@
           <button id="toggleRecentBtn" class="collapse-btn" aria-expanded="true" aria-controls="recentContent">▾</button>
         </div>
         <div id="recentContent" class="collapsible open">
+          <div class="calendar-head">
+            <strong>날짜순 경기 달력</strong>
+            <span class="muted small">날짜를 누르면 상세 정보가 열려요</span>
+          </div>
           <div id="recentCalendar" class="mini-calendar"></div>
           <div id="selectedGameDetail" class="selected-game-card muted">날짜를 누르면 경기 상세가 보여요.</div>
           <div id="recentGamesList" class="games-list"></div>
@@ -111,66 +115,69 @@
             <p class="eyebrow">WRITE</p>
             <h3>오늘의 기록</h3>
           </div>
+          <button id="toggleRecordBtn" class="collapse-btn" aria-expanded="true" aria-controls="recordContent">▾</button>
         </div>
 
-        <div class="segmented mode-tabs" id="writeModeTabs">
-          <button class="segmented-btn active" data-mode="template">템플릿</button>
-          <button class="segmented-btn" data-mode="free">자유 양식</button>
-        </div>
+        <div id="recordContent" class="collapsible open">
+          <div class="segmented mode-tabs" id="writeModeTabs">
+            <button class="segmented-btn active" data-mode="template">템플릿</button>
+            <button class="segmented-btn" data-mode="free">자유 양식</button>
+          </div>
 
-        <div id="templateFields" class="form-grid">
-          <div class="field">
-            <label for="feeling">오늘의 감정</label>
-            <select id="feeling" class="select-field">
-              <option>답답했음</option>
-              <option>희망이 보였음</option>
-              <option>재밌었음</option>
-              <option>화났음</option>
-              <option>아쉽지만 볼 건 있었음</option>
-            </select>
+          <div id="templateFields" class="form-grid">
+            <div class="field">
+              <label for="feeling">오늘의 감정</label>
+              <select id="feeling" class="select-field">
+                <option>답답했음</option>
+                <option>희망이 보였음</option>
+                <option>재밌었음</option>
+                <option>화났음</option>
+                <option>아쉽지만 볼 건 있었음</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="oneLine">한 줄 요약</label>
+              <input id="oneLine" type="text" placeholder="예: 불펜 흔들렸지만 타선 집중력은 좋았음" />
+            </div>
+            <div class="field full">
+              <label for="goodPoint">좋았던 장면</label>
+              <textarea id="goodPoint" rows="3" placeholder="좋았던 플레이나 선수"></textarea>
+            </div>
+            <div class="field full">
+              <label for="badPoint">아쉬웠던 장면</label>
+              <textarea id="badPoint" rows="3" placeholder="욕설 섞여도 괜찮아. 아래에서 기록용으로 짧게 정리해줄게."></textarea>
+            </div>
+            <div class="field full">
+              <label for="nextPoint">다음 경기에서 보고 싶은 점</label>
+              <textarea id="nextPoint" rows="3" placeholder="예: 초반 실점 줄이기, 주루 판단 안정화"></textarea>
+            </div>
           </div>
-          <div class="field">
-            <label for="oneLine">한 줄 요약</label>
-            <input id="oneLine" type="text" placeholder="예: 불펜 흔들렸지만 타선 집중력은 좋았음" />
-          </div>
-          <div class="field full">
-            <label for="goodPoint">좋았던 장면</label>
-            <textarea id="goodPoint" rows="3" placeholder="좋았던 플레이나 선수"></textarea>
-          </div>
-          <div class="field full">
-            <label for="badPoint">아쉬웠던 장면</label>
-            <textarea id="badPoint" rows="3" placeholder="욕설 섞여도 괜찮아. 아래에서 기록용으로 정리해줄게."></textarea>
-          </div>
-          <div class="field full">
-            <label for="nextPoint">다음 경기에서 보고 싶은 점</label>
-            <textarea id="nextPoint" rows="3" placeholder="예: 초반 실점 줄이기, 주루 판단 안정화"></textarea>
-          </div>
-        </div>
 
-        <div id="freeFields" class="form-grid hidden">
-          <div class="field full">
-            <label for="freeNote">자유 기록</label>
-            <textarea id="freeNote" rows="8" placeholder="감정적으로 적어도 괜찮아. 아래에서 짧고 매끈한 기록 문장으로 바꿔줄게."></textarea>
+          <div id="freeFields" class="form-grid hidden">
+            <div class="field full">
+              <label for="freeNote">자유 기록</label>
+              <textarea id="freeNote" rows="8" placeholder="감정적으로 적어도 괜찮아. 아래에서 짧고 매끈한 기록 문장으로 바꿔줄게."></textarea>
+            </div>
           </div>
-        </div>
 
-        <div class="tool-row">
-          <button id="softenBtn" class="primary-btn">GPT로 순화하기</button>
-          <button id="previewBtn" class="ghost-btn">미리보기 만들기</button>
-        </div>
+          <div class="tool-row">
+            <button id="softenBtn" class="primary-btn">GPT로 순화하기</button>
+            <button id="previewBtn" class="ghost-btn">미리보기 만들기</button>
+          </div>
 
-        <div class="response-grid single-mobile">
-          <article class="response-card">
-            <p class="eyebrow">SOFTENED</p>
-            <h4>짧은 순화 결과</h4>
-            <div id="softenResult" class="response-body muted">아직 정리된 문장이 없어요.</div>
-            <div id="softenAlternatives" class="alt-chips"></div>
-          </article>
-          <article class="response-card">
-            <p class="eyebrow">PREVIEW</p>
-            <h4>기록 미리보기</h4>
-            <div id="previewResult" class="response-body muted">버튼을 누르면 사용자가 적은 내용을 자연스러운 회고문으로 정리해줘요.</div>
-          </article>
+          <div class="response-grid single-mobile">
+            <article class="response-card">
+              <p class="eyebrow">SOFTENED</p>
+              <h4>짧은 순화 결과</h4>
+              <div id="softenResult" class="response-body muted">아직 정리된 문장이 없어요.</div>
+              <div id="softenAlternatives" class="alt-chips"></div>
+            </article>
+            <article class="response-card">
+              <p class="eyebrow">PREVIEW</p>
+              <h4>기록 미리보기</h4>
+              <div id="previewResult" class="response-body muted">버튼을 누르면 사용자가 적은 내용을 자연스러운 회고문으로 정리해줘요.</div>
+            </article>
+          </div>
         </div>
       </section>
     </main>

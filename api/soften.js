@@ -1,48 +1,44 @@
-const clampSentence = (text = '', max = 72) => {
-  const cleaned = text.replace(/\s+/g, ' ').trim();
+const clampSentence = (text = '', max = 44) => {
+  const cleaned = String(text).replace(/\s+/g, ' ').trim();
+  if (!cleaned) return '';
   if (cleaned.length <= max) return cleaned;
   return `${cleaned.slice(0, max - 1).trim()}…`;
 };
 
-const compress = (text = '') => {
-  return clampSentence(
-    text
-      .replace(/감정:\s*/g, '')
-      .replace(/한 줄 요약:\s*/g, '')
-      .replace(/좋았던 장면:\s*/g, '')
-      .replace(/아쉬웠던 장면:\s*/g, '')
-      .replace(/다음 경기 기대:\s*/g, '')
-      .replace(/\n+/g, ' · ')
-  );
+const cleanBaseballTone = (text = '') => {
+  let out = String(text);
+  const replacements = [
+    [/개새끼|개쉑|개색기|개색끼|개놈|새끼야/gi, '선수가 많이 아쉬웠다'],
+    [/씨발|시발|ㅆㅂ|ㅅㅂ|시바/gi, '정말'],
+    [/존나|겁나|뒤지게/gi, '너무'],
+    [/개잘했|개잘하|존잘하/gi, '정말 잘했'],
+    [/개못했|개못하|존못하/gi, '많이 아쉬웠'],
+    [/병신|븅신|멍청하네|돌대가리/gi, '판단이 아쉬웠다'],
+    [/미친|돌았네|레전드네/gi, '강하게 느껴졌다'],
+    [/빡치|열받|짜증나|짜치/gi, '답답하'],
+    [/꺼져|망했네|왜 저래|뭐하냐|어이없네/gi, '흐름이 아쉬웠다'],
+    [/못하네|못하냐|말이 되냐/gi, '경기력이 기대에 못 미쳤다'],
+    [/개판|노답|답이 없네/gi, '운영이 많이 아쉬웠다']
+  ];
+  replacements.forEach(([pattern, value]) => { out = out.replace(pattern, value); });
+  return out.replace(/\s+/g, ' ').trim();
 };
 
 const fallbackSoften = (text = '') => {
-  let out = text;
-  const replacements = [
-    [/개새끼|개쉑|개색기|개색끼|개놈/gi, '플레이가 많이 아쉬웠다'],
-    [/씨발|시발|ㅅㅂ|ㅆㅂ/gi, '정말'],
-    [/존나|겁나/gi, '꽤'],
-    [/개잘/gi, '정말 좋게'],
-    [/개못/gi, '많이 아쉽게'],
-    [/병신|븅신/gi, '판단이 아쉬웠다'],
-    [/미친|미쳤네|돌았네/gi, '강하게 느껴졌다'],
-    [/빡치|열받/gi, '답답하'],
-    [/꺼져|짜증나/gi, '아쉬움이 크다'],
-    [/못하네|못하냐/gi, '경기력이 기대에 못 미쳤다'],
-    [/왜 저래|뭐하냐/gi, '판단이 아쉽다'],
-    [/망했네/gi, '흐름이 좋지 않았다']
-  ];
+  const cleaned = cleanBaseballTone(text)
+    .replace(/감정:\s*/g, '')
+    .replace(/한 줄 요약:\s*/g, '')
+    .replace(/좋았던 장면:\s*/g, '')
+    .replace(/아쉬웠던 장면:\s*/g, '')
+    .replace(/다음 경기 기대:\s*/g, '')
+    .replace(/\n+/g, ' ');
 
-  replacements.forEach(([pattern, value]) => {
-    out = out.replace(pattern, value);
-  });
-
-  const short = compress(out);
+  const softened = clampSentence(cleaned || '오늘 경기는 운영이 아쉬웠다.', 38);
   return {
-    softened: short || '오늘 경기는 아쉬움이 크게 남았다.',
+    softened,
     alternatives: [
-      clampSentence(`${short} 경기 흐름을 다시 볼 필요가 있다.`),
-      clampSentence(`${short} 다음 경기에서 보완점이 보였다.`)
+      clampSentence(`${softened} 그래도 볼 점은 있었다.`, 30),
+      clampSentence('다음 경기 보완점이 더 선명해졌다.', 30)
     ]
   };
 };
@@ -57,23 +53,23 @@ module.exports = async (req, res) => {
 
   try {
     const { text = '', team = '' } = req.body || {};
-    if (!text.trim()) return res.status(400).json({ error: 'text is required' });
+    if (!String(text).trim()) return res.status(400).json({ error: 'text is required' });
 
     if (!process.env.OPENAI_API_KEY) {
       return res.status(200).json({ mode: 'fallback', ...fallbackSoften(text) });
     }
 
     const prompt = `너는 KBO 팬 기록 앱의 문장 정리 도우미야.
-사용자 원문은 욕설이나 과격한 말이 섞여 있을 수 있다.
-해야 할 일:
-1) 욕설과 비속어를 자연스럽게 지운다.
-2) 감정은 남기되 공격적 표현은 기록형 문장으로 바꾼다.
-3) 결과는 반드시 짧고 간결해야 한다.
-4) softened는 한 문장, 45자 이내.
-5) alternatives는 각 28자 이내의 아주 짧은 대안 2개.
-6) 한국어만 사용.
+원문에는 쌍욕과 과격한 표현이 섞여 있을 수 있다.
+반드시 해야 할 일:
+1) 욕설과 비속어를 완전히 없앤다.
+2) 경기 관찰 문장처럼 짧게 바꾼다.
+3) softened는 한국어 한 문장, 38자 이내.
+4) alternatives는 한국어 두 문장, 각 24자 이내.
+5) 길게 설명하지 말고 감정만 과하지 않게 남긴다.
+6) JSON만 반환한다.
 
-반드시 JSON만 반환:
+출력 형식:
 {
   "softened": "...",
   "alternatives": ["...", "..."]
@@ -89,7 +85,7 @@ module.exports = async (req, res) => {
         'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'gpt-5.4-mini',
+        model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
         input: prompt,
         text: {
           format: {
@@ -133,8 +129,8 @@ module.exports = async (req, res) => {
 
     return res.status(200).json({
       mode: 'openai',
-      softened: clampSentence(parsed.softened, 72),
-      alternatives: (parsed.alternatives || []).slice(0, 2).map(item => clampSentence(item, 40))
+      softened: clampSentence(parsed.softened, 38),
+      alternatives: (parsed.alternatives || []).slice(0, 2).map(item => clampSentence(item, 24))
     });
   } catch (error) {
     return res.status(200).json({ mode: 'fallback', error: String(error), ...fallbackSoften(req.body?.text || '') });
