@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#0b0d12" />
+  <meta name="theme-color" content="#0d1117" />
   <title>덕아웃 노트</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -13,22 +13,21 @@
       <div>
         <p class="eyebrow">MOBILE FIRST KBO NOTE</p>
         <h1>덕아웃 노트</h1>
+        <p class="top-sub">욕 대신, 경기와 감정을 기록으로 남겨요.</p>
       </div>
-      <button id="themeToggle" class="ghost-btn" aria-label="테마 전환">나이트</button>
+      <button id="themeToggle" class="ghost-btn compact" aria-label="테마 전환">나이트</button>
     </header>
 
     <main class="content">
-      <section class="hero-card accent-border">
+      <section class="hero-card accent-border glow-card">
         <div class="hero-copy">
-          <p class="eyebrow">욕 대신 기록</p>
-          <h2><span id="heroTeam">LG</span> 팬의 오늘을 남기는 방식</h2>
-          <p>
-            마이팀 기준으로 경기와 순위를 보고, 감정은 정리해서 기록으로 남겨요.
-          </p>
+          <p class="eyebrow">MY TEAM BOARD</p>
+          <h2><span id="heroTeam">LG</span> 팬의 오늘을 더 매끄럽게</h2>
+          <p>마이팀 경기, 순위, 기록 작성, 감정 정리를 한 화면에 담은 모바일 홈.</p>
         </div>
         <div class="hero-actions">
-          <button class="primary-btn" data-scroll="recordSection">바로 기록하기</button>
-          <button class="ghost-btn" data-scroll="gamesSection">최근 경기 보기</button>
+          <button class="primary-btn" data-scroll="recordSection">기록하기</button>
+          <button class="ghost-btn" data-scroll="recentSection">최근 경기</button>
         </div>
       </section>
 
@@ -42,13 +41,13 @@
           </div>
           <label class="field-label" for="myTeamSelect">응원 구단</label>
           <select id="myTeamSelect" class="select-field"></select>
-          <p class="muted">설정한 구단에 따라 키 컬러와 메인 경기 정보가 바뀝니다.</p>
+          <p class="muted">키 컬러가 구단에 맞춰 자연스럽게 바뀌고, 메인 홈도 같이 바뀝니다.</p>
         </article>
 
         <article class="panel accent-border">
           <div class="panel-head">
             <div>
-              <p class="eyebrow">VIEW MODE</p>
+              <p class="eyebrow">RANGE</p>
               <h3>최근 경기 범위</h3>
             </div>
           </div>
@@ -56,7 +55,7 @@
             <button class="segmented-btn active" data-limit="5">최근 5경기</button>
             <button class="segmented-btn" data-limit="10">최근 10경기</button>
           </div>
-          <p class="muted">마이팀 경기만 공식 KBO 기준으로 불러옵니다.</p>
+          <p class="muted">KBO 기준 마이팀 경기만 보입니다.</p>
         </article>
       </section>
 
@@ -72,25 +71,38 @@
           <div id="todayGameCard" class="game-focus skeleton-block"></div>
         </article>
 
-        <article class="panel accent-border" id="standingPanel">
-          <div class="panel-head">
+        <article class="panel accent-border compact-panel" id="standingPanel">
+          <div class="panel-head tight">
             <div>
               <p class="eyebrow">RANK</p>
               <h3>마이팀 순위</h3>
             </div>
+            <button id="toggleStandingsBtn" class="collapse-btn" aria-expanded="false" aria-controls="fullStandingsWrap">▸</button>
           </div>
           <div id="myStandingCard" class="standing-focus skeleton-block"></div>
+          <div id="fullStandingsWrap" class="side-drawer collapsed">
+            <div class="drawer-head">
+              <strong>전체 순위</strong>
+              <span class="muted small">접기 가능</span>
+            </div>
+            <div id="standingsTable" class="standings-table mini"></div>
+          </div>
         </article>
       </section>
 
-      <section class="panel accent-border" id="gamesSection">
+      <section class="panel accent-border" id="recentSection">
         <div class="panel-head">
           <div>
             <p class="eyebrow">RECENT</p>
             <h3>마이팀 최근 경기</h3>
           </div>
+          <button id="toggleRecentBtn" class="collapse-btn" aria-expanded="true" aria-controls="recentContent">▾</button>
         </div>
-        <div id="recentGamesList" class="games-list"></div>
+        <div id="recentContent" class="collapsible open">
+          <div id="recentCalendar" class="mini-calendar"></div>
+          <div id="selectedGameDetail" class="selected-game-card muted">날짜를 누르면 경기 상세가 보여요.</div>
+          <div id="recentGamesList" class="games-list"></div>
+        </div>
       </section>
 
       <section class="panel accent-border" id="recordSection">
@@ -127,7 +139,7 @@
           </div>
           <div class="field full">
             <label for="badPoint">아쉬웠던 장면</label>
-            <textarea id="badPoint" rows="3" placeholder="욕을 써도 아래에서 순화할 수 있게 도와줄게"></textarea>
+            <textarea id="badPoint" rows="3" placeholder="욕설 섞여도 괜찮아. 아래에서 기록용으로 정리해줄게."></textarea>
           </div>
           <div class="field full">
             <label for="nextPoint">다음 경기에서 보고 싶은 점</label>
@@ -138,20 +150,21 @@
         <div id="freeFields" class="form-grid hidden">
           <div class="field full">
             <label for="freeNote">자유 기록</label>
-            <textarea id="freeNote" rows="8" placeholder="감정적으로 적어도 괜찮아. 아래에서 기록용 문장으로 정리해줄게."></textarea>
+            <textarea id="freeNote" rows="8" placeholder="감정적으로 적어도 괜찮아. 아래에서 짧고 매끈한 기록 문장으로 바꿔줄게."></textarea>
           </div>
         </div>
 
         <div class="tool-row">
-          <button id="softenBtn" class="primary-btn">GPT로 욕 순화하기</button>
-          <button id="previewBtn" class="ghost-btn">줄글 미리보기 만들기</button>
+          <button id="softenBtn" class="primary-btn">GPT로 순화하기</button>
+          <button id="previewBtn" class="ghost-btn">미리보기 만들기</button>
         </div>
 
-        <div class="response-grid">
+        <div class="response-grid single-mobile">
           <article class="response-card">
             <p class="eyebrow">SOFTENED</p>
-            <h4>순화 결과</h4>
+            <h4>짧은 순화 결과</h4>
             <div id="softenResult" class="response-body muted">아직 정리된 문장이 없어요.</div>
+            <div id="softenAlternatives" class="alt-chips"></div>
           </article>
           <article class="response-card">
             <p class="eyebrow">PREVIEW</p>
@@ -159,16 +172,6 @@
             <div id="previewResult" class="response-body muted">버튼을 누르면 사용자가 적은 내용을 자연스러운 회고문으로 정리해줘요.</div>
           </article>
         </div>
-      </section>
-
-      <section class="panel accent-border">
-        <div class="panel-head">
-          <div>
-            <p class="eyebrow">STANDINGS</p>
-            <h3>전체 순위</h3>
-          </div>
-        </div>
-        <div id="standingsTable" class="standings-table"></div>
       </section>
     </main>
   </div>
