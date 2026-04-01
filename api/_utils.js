@@ -1,14 +1,14 @@
 const TEAM_MAP = {
-  LG: { ko: 'LG', color: '#B31F45' },
-  KIA: { ko: 'KIA', color: '#D91F36' },
-  DOOSAN: { ko: '두산', color: '#1B1F48' },
-  SAMSUNG: { ko: '삼성', color: '#006DFF' },
-  LOTTE: { ko: '롯데', color: '#0E2E63' },
-  NC: { ko: 'NC', color: '#315D9A' },
-  KT: { ko: 'KT', color: '#232733' },
-  HANWHA: { ko: '한화', color: '#F36B21' },
-  SSG: { ko: 'SSG', color: '#C01E37' },
-  KIWOOM: { ko: '키움', color: '#6B1830' }
+  LG: { ko: 'LG', color: '#B31F45', kboCode: 'LG' },
+  KIA: { ko: 'KIA', color: '#D91F36', kboCode: 'HT' },
+  DOOSAN: { ko: '두산', color: '#1B1F48', kboCode: 'OB' },
+  SAMSUNG: { ko: '삼성', color: '#006DFF', kboCode: 'SS' },
+  LOTTE: { ko: '롯데', color: '#0E2E63', kboCode: 'LT' },
+  NC: { ko: 'NC', color: '#315D9A', kboCode: 'NC' },
+  KT: { ko: 'KT', color: '#232733', kboCode: 'KT' },
+  HANWHA: { ko: '한화', color: '#F36B21', kboCode: 'HH' },
+  SSG: { ko: 'SSG', color: '#C01E37', kboCode: 'SK' },
+  KIWOOM: { ko: '키움', color: '#6B1830', kboCode: 'WO' }
 };
 const TEAM_CODES = Object.keys(TEAM_MAP);
 const TEAM_PATTERN = TEAM_CODES.join('|');
@@ -105,6 +105,23 @@ function inferOpponent(game, team) {
   return game.home === team ? game.away : game.home;
 }
 
+
+function toKboGameCode(eng) {
+  return TEAM_MAP[eng]?.kboCode || eng;
+}
+
+function toCompactDate(dateString = '') {
+  return String(dateString).replace(/-/g, '');
+}
+
+function buildKboGameIds(dateString, awayTeam, homeTeam) {
+  const dateCompact = toCompactDate(dateString);
+  const away = toKboGameCode(normalizeTeam(awayTeam));
+  const home = toKboGameCode(normalizeTeam(homeTeam));
+  const base = `${dateCompact}${away}${home}`;
+  return [`${base}0`, `${base}1`, `${base}2`];
+}
+
 module.exports = {
   TEAM_MAP,
   TEAM_CODES,
@@ -118,5 +135,8 @@ module.exports = {
   htmlToText,
   fetchHtml,
   fetchHtmlWithTimeout,
-  inferOpponent
+  inferOpponent,
+  toKboGameCode,
+  toCompactDate,
+  buildKboGameIds
 };

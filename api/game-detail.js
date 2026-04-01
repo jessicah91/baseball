@@ -1,25 +1,88 @@
-const { htmlToLines, fetchHtml } = require('./_utils');
+const {
+  htmlToLines,
+  fetchHtmlWithTimeout,
+  buildKboGameIds,
+  toCompactDate,
+  normalizeTeam
+} = require('./_utils');
 
-function pick(text, patterns) {
+function cleanName(value) {
+  return String(value || '')
+    .replace(/\([^)]*\)/g, '')
+    .replace(/^[\s:,-]+|[\s:,-]+$/g, '')
+    .trim() || null;
+}
+
+function firstMatch(text, patterns) {
   for (const pattern of patterns) {
     const match = text.match(pattern);
-    if (match?.[1]) return match[1].trim();
+    if (match?.[1]) return cleanName(match[1]);
   }
   return null;
 }
 
-function parseExtrasFromText(text = '') {
-  const compact = String(text).replace(/\s+/g, ' ').trim();
-  const holds = [
-    ...compact.matchAll(/홀드투수\s*:?\s*([A-Za-z가-힣 .,'-]+)/gi),
-    ...compact.matchAll(/Hold(?: Pitcher)?\s*:?\s*([A-Za-z가-힣 .,'-]+)/gi)
-  ].map(match => match[1].trim()).filter(Boolean);
+function parseHolds(text) {
+  const values = [];
+  const patterns = [
+    /홀드투수\s*:?\s*([^\n]+)/gi,
+    /홀드\s*:?\s*([^\n]+)/gi
+  ];
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      const raw = match[1]
+        .split(/[·;]|\/|,/)
+        .map(cleanName)
+        .filter(Boolean);
+      values.push(...raw);
+    }
+  }
+  return [...new Set(values)].join(', ') || null;
+}
+
+function parseExtrasFromKboText(lines = []) {
+  const joined = lines.join('\n');
   return {
-    winningPitcher: pick(compact, [/승리투수\s*:?\s*([A-Za-z가-힣 .,'-]+)/i, /Winning Pitcher\s*:?\s*([A-Za-z가-힣 .,'-]+)/i]),
-    losingPitcher: pick(compact, [/패전투수\s*:?\s*([A-Za-z가-힣 .,'-]+)/i, /Losing Pitcher\s*:?\s*([A-Za-z가-힣 .,'-]+)/i]),
-    savePitcher: pick(compact, [/세이브투수\s*:?\s*([A-Za-z가-힣 .,'-]+)/i, /Save Pitcher\s*:?\s*([A-Za-z가-힣 .,'-]+)/i]),
-    holdPitchers: holds.length ? [...new Set(holds)].join(', ') : null,
-    decisiveHitter: pick(compact, [/결승타(?:자)?\s*:?\s*([A-Za-z가-힣 .,'-]+)/i, /Decisive Hit(?:ter)?\s*:?\s*([A-Za-z가-힣 .,'-]+)/i])
+    winningPitcher: firstMatch(joined, [/승리투수\s*:?\s*([^\n]+)/i, /승\s*리\s*투\s*수\s*:?\s*([^\n]+)/i]),
+    losingPitcher: firstMatch(joined, [/패전투수\s*:?\s*([^\n]+)/i]),
+    savePitcher: firstMatch(joined, [/세이브투수\s*:?\s*([^\n]+)/i]),
+    holdPitchers: parseHolds(joined),
+    decisiveHitter: firstMatch(joined, [/결승타(?:자|\s선수)?\s*:?\s*([^\n]+)/i])
+  };
+}
+
+function hasUsefulDetail(detail) {
+  return Boolean(detail.winningPitcher || detail.losingPitcher || detail.savePitcher || detail.holdPitchers || detail.decisiveHitter);
+}
+
+async function tryFetchOfficialDetail(date, away, home) {
+  const gameIds = buildKboGameIds(date, away, home);
+  const compactDate = toCompactDate(date);
+  const urls = [];
+  for (const gameId of gameIds) {
+    urls.push(`https://www.koreabaseball.com/Schedule/GameCenter/Main.aspx?gameDate=${compactDate}&gameId=${gameId}`);
+    urls.push(`https://www.koreabaseball.com/Schedule/GameCenter/Main.aspx?gameDate=${compactDate}&gameId=${gameId}&section=REVIEW`);
+  }
+
+  for (const url of urls) {
+    try {
+      const html = await fetchHtmlWithTimeout(url, 3200);
+      const detail = parseExtrasFromKboText(htmlToLines(html));
+      if (hasUsefulDetail(detail)) {
+        return { ...detail, sourceUrl: url };
+      }
+    } catch (error) {
+      // try next candidate
+    }
+  }
+
+  return {
+    winningPitcher: null,
+    losingPitcher: null,
+    savePitcher: null,
+    holdPitchers: null,
+    decisiveHitter: null,
+    sourceUrl: null
   };
 }
 
@@ -27,22 +90,18 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   const date = String(req.query.date || '').trim();
-  const awayKo = String(req.query.awayKo || req.query.away || '').trim();
-  const homeKo = String(req.query.homeKo || req.query.home || '').trim();
-  if (!date || !awayKo || !homeKo) {
-    return res.status(200).json({ winningPitcher: null, losingPitcher: null, savePitcher: null, holdPitchers: null, decisiveHitter: null });
+  const away = normalizeTeam(req.query.away || '');
+  const home = normalizeTeam(req.query.home || '');
+
+  if (!date || !away || !home) {
+    return res.status(200).json({ winningPitcher: null, losingPitcher: null, savePitcher: null, holdPitchers: null, decisiveHitter: null, sourceUrl: null });
   }
 
-  try {
-    const query = encodeURIComponent(`${date.replace(/-/g, '.')} ${awayKo} ${homeKo} 승리투수 패전투수 세이브투수 홀드투수 결승타 네이버 스포츠 국내야구`);
-    const html = await fetchHtml(`https://search.naver.com/search.naver?where=nexearch&query=${query}`);
-    const extras = parseExtrasFromText(htmlToLines(html).join(' '));
-    return res.status(200).json(extras);
-  } catch (error) {
-    return res.status(200).json({ winningPitcher: null, losingPitcher: null, savePitcher: null, holdPitchers: null, decisiveHitter: null });
-  }
+  const detail = await tryFetchOfficialDetail(date, away, home);
+  return res.status(200).json(detail);
 };

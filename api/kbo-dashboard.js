@@ -128,29 +128,40 @@ function parseDailyScheduleForDate(text, searchDate) {
   return games;
 }
 
-function parseStandings(lines) {
-  const re = new RegExp(`^(\\d+)\\s+(${TEAM_PATTERN})\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+([\\d.]+)\\s+([\\d.-]+)\\s+([WLD]\\d+)\\s+(\\d+-\\d+-\\d+)\\s+(\\d+-\\d+-\\d+)$`);
-  const list = [];
+function parseStandingsKorean(lines) {
+  const standings = [];
+  let inTable = false;
+  const rowRe = /^(\d+)\s+(KT|SSG|NC|한화|롯데|삼성|두산|LG|KIA|키움)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+([\d.]+)\s+([\d.\-]+)\s+(\d+승\d+무\d+패)\s+(\d+승|\d+패|\d+무|-)\s+([\d-]+)\s+([\d-]+)$/;
+
   for (const line of lines) {
-    const m = line.match(re);
+    if (line.startsWith('순위 팀명 경기 승 패 무 승률 게임차 최근10경기 연속 홈 방문')) {
+      inTable = true;
+      continue;
+    }
+    if (!inTable) continue;
+    if (line.startsWith('팀간 승패표')) break;
+    const m = line.match(rowRe);
     if (!m) continue;
-    const [, rank, team, games, wins, losses, draws, pct, gb, streak, home, away] = m;
-    list.push({
+    const [, rank, teamKo, games, wins, losses, draws, pct, gb, recent10, streak, home, away] = m;
+    const team = normalizeTeam(teamKo);
+    standings.push({
       rank: Number(rank),
       team,
-      teamKo: toKoreanTeam(team),
+      teamKo,
       games: Number(games),
       wins: Number(wins),
       losses: Number(losses),
       draws: Number(draws),
       pct,
       gb,
+      recent10,
       streak,
       home,
       away
     });
   }
-  return list.slice(0, 10);
+
+  return standings;
 }
 
 module.exports = async (req, res) => {
@@ -165,7 +176,7 @@ module.exports = async (req, res) => {
   const today = koreaDateString();
 
   const scoreboardPromise = fetchHtmlWithTimeout(`https://eng.koreabaseball.com/Schedule/Scoreboard.aspx?searchDate=${today}`, 3500);
-  const standingsPromise = fetchHtmlWithTimeout('https://eng.koreabaseball.com/Standings/TeamStandings.aspx', 3500);
+  const standingsPromise = fetchHtmlWithTimeout('https://www.koreabaseball.com/Record/TeamRank/TeamRank.aspx', 3500);
   const dailyPromise = fetchHtmlWithTimeout('https://eng.koreabaseball.com/Schedule/DailySchedule.aspx', 3500);
 
   const [scoreboardResult, standingsResult, dailyResult] = await Promise.allSettled([
@@ -183,7 +194,7 @@ module.exports = async (req, res) => {
   }
 
   const standings = standingsResult.status === 'fulfilled'
-    ? parseStandings(htmlToLines(standingsResult.value))
+    ? parseStandingsKorean(htmlToLines(standingsResult.value))
     : [];
 
   const rawTodayGame = todayGames.find(game => game.home === team || game.away === team) || null;
