@@ -1,3 +1,24 @@
+@font-face {
+  font-family: "KBODia";
+  src: url("./fonts/KBO Dia Gothic_light.ttf") format("truetype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "KBODia";
+  src: url("./fonts/KBO Dia Gothic_medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "KBODia";
+  src: url("./fonts/KBO Dia Gothic_bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
 :root {
   --bg: #f4f5f7;
   --bg2: #eceff3;
@@ -13,8 +34,11 @@
   --pixel-shadow: 0 0 0 1px rgba(17,24,39,0.04), 4px 4px 0 rgba(17,24,39,0.06);
   --radius: 22px;
   --radius-sm: 14px;
-  --font-main: local("KBO Dia Gothic"), local("KBO 다이아고딕"), "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+  --font-main: "KBODia", local("KBO Dia Gothic"), local("KBO 다이아고딕"), "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
   --font-pixel: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --button-shadow: 0 2px 0 rgba(255,255,255,0.18) inset, 0 -3px 0 rgba(0,0,0,0.22) inset, 0 8px 18px rgba(0,0,0,0.12);
+  --button-shadow-active: 0 1px 0 rgba(255,255,255,0.12) inset, 0 -1px 0 rgba(0,0,0,0.22) inset;
+  --surface-grid: linear-gradient(to right, rgba(var(--accent-rgb),0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(var(--accent-rgb),0.06) 1px, transparent 1px);
 }
 
 body[data-theme="dark"] {
@@ -37,21 +61,23 @@ body {
   font-family: var(--font-main);
   color: var(--text);
   background:
-    radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.15), transparent 28%),
+    radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.16), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(var(--accent-rgb), 0.08), transparent 22%),
     linear-gradient(180deg, var(--bg), var(--bg2));
   transition: background-color 220ms ease, color 220ms ease;
+  image-rendering: pixelated;
 }
 
 .screen-noise {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  opacity: 0.08;
+  opacity: 0.12;
   background-image:
-    linear-gradient(to right, transparent 0 23px, rgba(var(--accent-rgb),0.06) 23px 24px),
-    linear-gradient(to bottom, transparent 0 23px, rgba(var(--accent-rgb),0.06) 23px 24px);
-  background-size: 24px 24px;
-  mask-image: radial-gradient(circle at center, black 30%, transparent 100%);
+    var(--surface-grid),
+    radial-gradient(circle at 1px 1px, rgba(255,255,255,0.06) 1px, transparent 0);
+  background-size: 18px 18px, 6px 6px;
+  mask-image: radial-gradient(circle at center, black 34%, transparent 100%);
 }
 
 .app-shell {
@@ -65,9 +91,12 @@ body {
 .content { display: grid; gap: 14px; }
 
 .frame {
-  background: linear-gradient(180deg, rgba(var(--accent-rgb),0.04), transparent 34%), var(--panel);
+  background:
+    linear-gradient(180deg, rgba(var(--accent-rgb),0.08), transparent 28%),
+    linear-gradient(180deg, rgba(255,255,255,0.06), transparent 26%),
+    var(--panel);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: 18px;
   box-shadow: var(--shadow), var(--pixel-shadow);
   position: relative;
   overflow: hidden;
@@ -75,16 +104,17 @@ body {
     background-color 220ms ease,
     border-color 220ms ease,
     box-shadow 220ms ease,
-    color 220ms ease;
+    color 220ms ease,
+    transform 180ms ease;
 }
 
 .frame::before,
 .frame::after {
   content: "";
   position: absolute;
-  width: 10px;
-  height: 10px;
-  border: 2px solid rgba(var(--accent-rgb),0.65);
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(var(--accent-rgb),0.7);
 }
 .frame::before {
   top: 10px;
@@ -157,17 +187,19 @@ h4 { font-size: 16px; line-height: 1.2; }
   grid-template-columns: 1.2fr 0.8fr;
   gap: 14px;
   background:
-    linear-gradient(135deg, rgba(var(--accent-rgb),0.16), transparent 38%),
-    repeating-linear-gradient(90deg, rgba(var(--accent-rgb),0.05) 0 12px, transparent 12px 24px),
+    linear-gradient(135deg, rgba(var(--accent-rgb),0.18), transparent 36%),
+    repeating-linear-gradient(90deg, rgba(var(--accent-rgb),0.05) 0 10px, transparent 10px 20px),
+    repeating-linear-gradient(180deg, rgba(255,255,255,0.03) 0 10px, transparent 10px 20px),
     var(--panel-strong);
 }
 .hero-copy p:last-child { margin-top: 10px; color: var(--muted); line-height: 1.55; font-size: 14px; }
 .hero-badges { display: grid; gap: 10px; }
 .badge-card {
   padding: 14px;
-  background: rgba(var(--accent-rgb),0.08);
-  border: 1px solid rgba(var(--accent-rgb),0.18);
-  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(var(--accent-rgb),0.14), rgba(var(--accent-rgb),0.08));
+  border: 1px solid rgba(var(--accent-rgb),0.22);
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 6px 12px rgba(0,0,0,0.08);
 }
 .badge-label {
   display: block;
@@ -240,20 +272,23 @@ textarea:focus {
 .ui-btn,
 .collapse-btn {
   border: 1px solid var(--line);
-  border-radius: 16px;
-  background: rgba(var(--accent-rgb),0.05);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(var(--accent-rgb),0.06));
   color: var(--text);
   min-height: 46px;
   padding: 0 14px;
   font: inherit;
+  font-weight: 700;
   cursor: pointer;
+  box-shadow: var(--button-shadow);
+  transform: translateY(0);
 }
 .segmented-btn.active,
 .ui-btn.primary {
-  background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.94), rgba(var(--accent-rgb), 0.78));
-  border-color: rgba(var(--accent-rgb), 0.85);
+  background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.98), rgba(var(--accent-rgb), 0.72));
+  border-color: rgba(var(--accent-rgb), 0.9);
   color: #fff;
-  box-shadow: 0 10px 22px rgba(var(--accent-rgb), 0.28);
+  box-shadow: 0 2px 0 rgba(255,255,255,0.18) inset, 0 -4px 0 rgba(0,0,0,0.22) inset, 0 10px 22px rgba(var(--accent-rgb), 0.28);
 }
 .ui-btn.ghost { background: rgba(var(--accent-rgb),0.05); }
 .ui-btn.compact { min-height: 40px; padding: 0 12px; }
@@ -500,3 +535,9 @@ textarea:focus {
   h1 { font-size: 27px; }
   h2 { font-size: 23px; }
 }
+
+.segmented-btn:hover, .ui-btn:hover, .collapse-btn:hover { filter: brightness(1.04); }
+.segmented-btn:active, .ui-btn:active, .collapse-btn:active { transform: translateY(2px); box-shadow: var(--button-shadow-active); }
+.calendar-day { box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 6px 14px rgba(0,0,0,0.1); }
+.focus-card, .standing-focus, .detail-card, .response-card { box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 10px 24px rgba(0,0,0,0.08); }
+body[data-theme="light"] .segmented-btn, body[data-theme="light"] .ui-btn, body[data-theme="light"] .collapse-btn { background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(var(--accent-rgb),0.08)); }

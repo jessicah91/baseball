@@ -362,12 +362,16 @@ async function fetchDashboard() {
 
   try {
     const response = await fetch(`/api/kbo-dashboard?team=${state.myTeam}&limit=${state.recentLimit}`);
+    if (!response.ok) throw new Error(`dashboard ${response.status}`);
     const data = await response.json();
     state.dashboard = data;
     renderTodayGame(data.myTodayGame || null);
     renderMyStanding(data.myStanding || null);
     renderStandings(data.standings || []);
     renderRecentGames(data.recentGames || []);
+    if ((data.standings || []).length || (data.recentGames || []).length || data.myTodayGame) {
+      els.todayStatus.textContent = data.myTodayGame?.statusLabel || '업데이트 완료';
+    }
   } catch (error) {
     state.dashboard = null;
     renderTodayGame(null);
