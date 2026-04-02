@@ -15,6 +15,7 @@ module.exports = async (req, res) => {
 
   try {
     payload.games = await fetchRecentGames(team.code, limit);
+    if (!payload.games.length) payload.error = '최근 경기 파싱 결과가 비어 있어요.';
   } catch (error) {
     payload.error = error.message;
   }

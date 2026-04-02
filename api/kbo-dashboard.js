@@ -24,6 +24,7 @@ module.exports = async (req, res) => {
   try {
     const scoreboard = await fetchScoreboardForDate(todayString);
     payload.myTodayGame = findTodayGame(scoreboard, team.code);
+    if (!scoreboard.length) payload.errors.scoreboard = '경기 파싱 결과가 비어 있어요.';
   } catch (error) {
     payload.errors.scoreboard = error.message;
   }
@@ -32,6 +33,7 @@ module.exports = async (req, res) => {
     const standings = await fetchDailyStandings();
     payload.standings = standings;
     payload.myStanding = getMyStanding(standings, team.code);
+    if (!standings.length) payload.errors.standings = '순위 파싱 결과가 비어 있어요.';
   } catch (error) {
     payload.errors.standings = error.message;
   }

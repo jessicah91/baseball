@@ -140,16 +140,11 @@ async function fetchHtml(url, options = {}) {
 }
 
 function parseStandingsFromDailyText(text) {
-  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
-  const startIndex = lines.findIndex((line) => line.includes('순위 팀명 경기 승 패 무 승률 게임차 최근10경기 연속 홈 방문'));
-  if (startIndex === -1) return [];
   const rows = [];
-  for (let i = startIndex + 1; i < lines.length; i += 1) {
-    const line = lines[i];
-    if (line.startsWith('팀간 승패표')) break;
-    const match = line.match(/^(\d+)\s+([A-Z가-힣]+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+([\d.]+)\s+([\d.]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)$/);
-    if (!match) continue;
-    const [, rank, teamName, games, wins, losses, draws, pct, gb, last10, streak, home, away] = match;
+  const re = /(?:^|\n)(\d+)\s+([A-Z가-힣]+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+([\d.]+)\s+([\d.]+)\s+([0-9승패무]+)\s+([0-9승패무]+)\s+([0-9-]+)\s+([0-9-]+)(?=\n|$)/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const [, rank, teamName, games, wins, losses, draws, pct, gb, last10, streak, home, away] = m;
     const code = getTeam(teamName).code;
     rows.push({
       rank: Number(rank),
@@ -170,6 +165,11 @@ function parseStandingsFromDailyText(text) {
   return rows;
 }
 
+function parsePitcherField(rest, label) {
+  const m = rest.match(new RegExp(`${label}:\s*([^\n]+?)(?=\s+[WSL]:|$)`));
+  return m ? m[1].trim() : null;
+}
+
 function parseScoreboardGames(text, targetDate) {
   const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
   const games = [];
@@ -182,12 +182,10 @@ function parseScoreboardGames(text, targetDate) {
     if (finalMatch) {
       const [, away, awayScore, homeScore, home] = finalMatch;
       const infoLine = lines[i + 1] || '';
-      const infoMatch = infoLine.match(/^([A-Z]+)\s+(\d{1,2}:\d{2})(?:\s+W:\s+(.+?))?(?:\s+S:\s+(.+?))?(?:\s+L:\s+(.+?))?$/);
+      const infoMatch = infoLine.match(/^([A-Z]+)\s+(\d{1,2}:\d{2})(.*)$/);
       const venue = infoMatch?.[1] || '';
       const time = infoMatch?.[2] || '';
-      const winningPitcher = infoMatch?.[3]?.trim() || null;
-      const savePitcher = infoMatch?.[4]?.trim() || null;
-      const losingPitcher = infoMatch?.[5]?.trim() || null;
+      const rest = infoMatch?.[3] || '';
       games.push({
         date: targetDate,
         status: 'final',
@@ -199,16 +197,17 @@ function parseScoreboardGames(text, targetDate) {
         homeTeam: getTeam(home).koShort,
         awayScore: Number(awayScore),
         homeScore: Number(homeScore),
-        winningPitcher,
-        savePitcher,
-        losingPitcher
+        winningPitcher: parsePitcherField(rest, 'W') || null,
+        savePitcher: parsePitcherField(rest, 'S') || null,
+        losingPitcher: parsePitcherField(rest, 'L') || null
       });
       continue;
     }
 
     const [, away, time, home] = scheduledMatch;
     const venueLine = lines[i + 1] || '';
-    const venue = venueLine.split(' ')[0] || '';
+    const venueMatch = venueLine.match(/^([A-Z]+)\s+(\d{1,2}:\d{2})/);
+    const venue = venueMatch?.[1] || venueLine.split(' ')[0] || '';
     games.push({
       date: targetDate,
       status: 'scheduled',
@@ -244,11 +243,16 @@ async function fetchRecentGames(teamCode, limit = 5) {
   const results = [];
   const seen = new Set();
   const base = new Date();
-  for (let offset = 1; offset <= 20 && results.length < limit; offset += 1) {
+  for (let offset = 1; offset <= 45 && results.length < limit; offset += 1) {
     const day = new Date(base);
     day.setDate(base.getDate() - offset);
     const dateString = formatEngScoreDate(day);
-    const games = await fetchScoreboardForDate(dateString);
+    let games = [];
+    try {
+      games = await fetchScoreboardForDate(dateString);
+    } catch (error) {
+      continue;
+    }
     for (const game of games) {
       if (game.status !== 'final') continue;
       if (![game.homeCode, game.awayCode].includes(teamCode)) continue;

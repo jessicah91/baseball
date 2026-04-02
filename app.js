@@ -146,7 +146,7 @@ async function loadGameDetail(game) {
   detail.classList.remove('hidden');
   detail.innerHTML = `<div class="empty-box">상세 정보를 불러오는 중...</div>`;
   try {
-    const response = await fetch(`/api/game-detail?date=${encodeURIComponent(game.date)}&away=${encodeURIComponent(game.awayCode)}&home=${encodeURIComponent(game.homeCode)}`);
+    const response = await fetch(`/api/game-detail?date=${encodeURIComponent(game.date)}&away=${encodeURIComponent(game.awayCode)}&home=${encodeURIComponent(game.homeCode)}&venue=${encodeURIComponent(game.venue || '')}&awayScore=${encodeURIComponent(game.awayScore ?? '')}&homeScore=${encodeURIComponent(game.homeScore ?? '')}`);
     const data = await response.json();
     detail.innerHTML = `
       <h3>${formatDateLabel(game.date)} ${game.awayTeam} ${game.awayScore} : ${game.homeScore} ${game.homeTeam}</h3>
