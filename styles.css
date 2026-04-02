@@ -575,3 +575,5 @@ body[data-theme="light"] .ui-btn.primary {
 
 .range-panel .segmented-btn { min-height: 38px; padding: 0 12px; font-size: 13px; }
 .range-panel h3 { font-size: 18px; }
+
+.tiny{font-size:11px;line-height:1.5;margin-top:8px;opacity:.72;word-break:keep-all;}

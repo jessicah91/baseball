@@ -123,11 +123,11 @@ function setCollapsible(targetEl, buttonEl, open) {
   buttonEl.setAttribute('aria-expanded', String(open));
 }
 
-function renderTodayGame(game) {
+function renderTodayGame(game, errorMessage = '') {
   if (!game) {
     els.todayStatus.textContent = '경기 없음';
     els.todayGameCard.classList.remove('loading');
-    els.todayGameCard.innerHTML = `<p class="muted">오늘은 ${els.heroTeam.textContent} 경기 일정이 확인되지 않아요.</p>`;
+    els.todayGameCard.innerHTML = `<p class="muted">오늘은 ${els.heroTeam.textContent} 경기 일정이 확인되지 않아요.</p>${errorMessage ? `<p class="muted tiny">${errorMessage}</p>` : ''}`;
     return;
   }
 
@@ -156,10 +156,10 @@ function renderTodayGame(game) {
   `;
 }
 
-function renderMyStanding(standing) {
+function renderMyStanding(standing, errorMessage = '') {
   if (!standing) {
     els.myStandingCard.classList.remove('loading');
-    els.myStandingCard.innerHTML = '<p class="muted">마이팀 순위 정보를 아직 가져오지 못했어요.</p>';
+    els.myStandingCard.innerHTML = `<p class="muted">마이팀 순위 정보를 아직 가져오지 못했어요.</p>${errorMessage ? `<p class="muted tiny">${errorMessage}</p>` : ''}`;
     return;
   }
   els.myStandingCard.classList.remove('loading');
@@ -174,9 +174,9 @@ function renderMyStanding(standing) {
   `;
 }
 
-function renderStandings(standings) {
+function renderStandings(standings, errorMessage = '') {
   if (!standings || !standings.length) {
-    els.standingsTable.innerHTML = '<p class="muted">전체 순위 정보를 아직 가져오지 못했어요.</p>';
+    els.standingsTable.innerHTML = `<p class="muted">전체 순위 정보를 아직 가져오지 못했어요.</p>${errorMessage ? `<p class="muted tiny">${errorMessage}</p>` : ''}`;
     return;
   }
   els.standingsTable.innerHTML = standings.map(item => `
@@ -195,10 +195,10 @@ function getGamesChronological() {
   return games.sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function renderRecentGames(games) {
+function renderRecentGames(games, errorMessage = '') {
   if (!games || !games.length) {
     els.recentCalendar.classList.remove('loading');
-    els.recentCalendar.innerHTML = '<p class="muted">최근 경기 기록을 가져오지 못했어요.</p>';
+    els.recentCalendar.innerHTML = `<p class="muted">최근 경기 기록을 가져오지 못했어요.</p>${errorMessage ? `<p class="muted tiny">${errorMessage}</p>` : ''}`;
     els.selectedGameDetail.textContent = '날짜를 누르면 상세 정보가 보여요.';
     return;
   }
@@ -358,10 +358,11 @@ async function fetchRecentGames() {
     if (!response.ok) throw new Error(`recent ${response.status}`);
     const data = await response.json();
     state.dashboard = { ...(state.dashboard || {}), recentGames: data.recentGames || [] };
-    renderRecentGames(data.recentGames || []);
+    const recentError = Array.isArray(data.errors) && data.errors.length ? 'KBO 응답 지연 중' : '';
+    renderRecentGames(data.recentGames || [], recentError);
   } catch (error) {
     state.dashboard = { ...(state.dashboard || {}), recentGames: [] };
-    renderRecentGames([]);
+    renderRecentGames([], 'API 연결 실패');
   }
 }
 
@@ -378,17 +379,17 @@ async function fetchDashboard() {
     if (!response.ok) throw new Error(`dashboard ${response.status}`);
     const data = await response.json();
     state.dashboard = { ...(state.dashboard || {}), ...data, recentGames: [] };
-    renderTodayGame(data.myTodayGame || null);
-    renderMyStanding(data.myStanding || null);
-    renderStandings(data.standings || []);
+    renderTodayGame(data.myTodayGame || null, data.errors?.scoreboard ? 'KBO 경기 응답 지연 중' : '');
+    renderMyStanding(data.myStanding || null, data.errors?.standings ? 'KBO 순위 응답 지연 중' : '');
+    renderStandings(data.standings || [], data.errors?.standings ? 'KBO 순위 응답 지연 중' : '');
     if ((data.standings || []).length || data.myTodayGame) {
       els.todayStatus.textContent = data.myTodayGame?.statusLabel || '업데이트 완료';
     }
   } catch (error) {
     state.dashboard = { recentGames: [] };
-    renderTodayGame(null);
-    renderMyStanding(null);
-    renderStandings([]);
+    renderTodayGame(null, 'API 연결 실패');
+    renderMyStanding(null, 'API 연결 실패');
+    renderStandings([], 'API 연결 실패');
   }
 
   fetchRecentGames();

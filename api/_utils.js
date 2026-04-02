@@ -68,24 +68,81 @@ function htmlToText(html = '') {
   return htmlToLines(html).join(' ');
 }
 
-async function fetchHtmlWithTimeout(url, timeoutMs = 5000) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(new Error('timeout')), timeoutMs);
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0',
-        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
-      },
-      cache: 'no-store',
-      redirect: 'follow',
-      signal: controller.signal
+const https = require('https');
+
+function buildBrowserHeaders(url) {
+  const origin = url.startsWith('https://eng.koreabaseball.com') ? 'https://eng.koreabaseball.com' : 'https://www.koreabaseball.com';
+  return {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+    'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache',
+    'Referer': origin + '/',
+    'Origin': origin,
+    'Connection': 'close',
+    'Upgrade-Insecure-Requests': '1'
+  };
+}
+
+function httpsGetText(url, timeoutMs = 6000) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { headers: buildBrowserHeaders(url) }, (res) => {
+      const status = res.statusCode || 0;
+      if (status >= 300 && status < 400 && res.headers.location) {
+        const target = new URL(res.headers.location, url).toString();
+        res.resume();
+        return resolve(httpsGetText(target, timeoutMs));
+      }
+      if (status < 200 || status >= 300) {
+        res.resume();
+        return reject(new Error(`HTTPS ${status} for ${url}`));
+      }
+      const chunks = [];
+      res.on('data', (chunk) => chunks.push(chunk));
+      res.on('end', () => {
+        const buffer = Buffer.concat(chunks);
+        resolve(buffer.toString('utf8'));
+      });
     });
-    if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.status}`);
-    return await response.text();
-  } finally {
-    clearTimeout(timer);
+    req.setTimeout(timeoutMs, () => req.destroy(new Error('timeout')));
+    req.on('error', reject);
+  });
+}
+
+async function fetchHtmlWithTimeout(url, timeoutMs = 5000) {
+  const attempts = [url];
+  if (url.includes('www.koreabaseball.com')) attempts.push(url.replace('www.koreabaseball.com', 'koreabaseball.com'));
+  if (url.includes('koreabaseball.com') && !url.includes('www.koreabaseball.com') && !url.includes('eng.koreabaseball.com')) attempts.push(url.replace('https://koreabaseball.com', 'https://www.koreabaseball.com'));
+
+  let lastError = null;
+  for (const target of [...new Set(attempts)]) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(new Error('timeout')), timeoutMs);
+    try {
+      const response = await fetch(target, {
+        headers: buildBrowserHeaders(target),
+        cache: 'no-store',
+        redirect: 'follow',
+        signal: controller.signal
+      });
+      if (!response.ok) throw new Error(`Fetch ${response.status} for ${target}`);
+      const text = await response.text();
+      if (text && text.length > 100) return text;
+      throw new Error(`Empty response for ${target}`);
+    } catch (error) {
+      lastError = error;
+      try {
+        const text = await httpsGetText(target, timeoutMs + 1000);
+        if (text && text.length > 100) return text;
+      } catch (httpsError) {
+        lastError = httpsError;
+      }
+    } finally {
+      clearTimeout(timer);
+    }
   }
+  throw lastError || new Error(`Failed to fetch ${url}`);
 }
 
 function inferOpponent(game, team) {
