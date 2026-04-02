@@ -103,18 +103,9 @@ async function requestBuffer(url, extraHeaders = {}) {
         const body = Buffer.concat(chunks);
         const encoding = String(res.headers['content-encoding'] || '').toLowerCase();
         const done = (buf) => resolve({ statusCode: res.statusCode || 0, headers: res.headers, body: buf });
-        if (encoding.includes('gzip')) {
-          zlib.gunzip(body, (err, buf) => err ? reject(err) : done(buf));
-          return;
-        }
-        if (encoding.includes('deflate')) {
-          zlib.inflate(body, (err, buf) => err ? reject(err) : done(buf));
-          return;
-        }
-        if (encoding.includes('br')) {
-          zlib.brotliDecompress(body, (err, buf) => err ? reject(err) : done(buf));
-          return;
-        }
+        if (encoding.includes('gzip')) return zlib.gunzip(body, (err, buf) => (err ? reject(err) : done(buf)));
+        if (encoding.includes('deflate')) return zlib.inflate(body, (err, buf) => (err ? reject(err) : done(buf)));
+        if (encoding.includes('br')) return zlib.brotliDecompress(body, (err, buf) => (err ? reject(err) : done(buf)));
         done(body);
       });
     }).on('error', reject);
@@ -129,8 +120,7 @@ async function fetchHtml(url, options = {}) {
       const response = await requestBuffer(url);
       const charset = String(response.headers['content-type'] || '').match(/charset=([^;]+)/i)?.[1]?.trim().toLowerCase();
       const decoder = charset && charset !== 'utf-8' ? charset : decode;
-      const html = iconv.decode(response.body, decoder === 'utf8' ? 'utf-8' : decoder);
-      return html;
+      return iconv.decode(response.body, decoder === 'utf8' ? 'utf-8' : decoder);
     } catch (error) {
       lastError = error;
       await sleep(200 * (attempt + 1));
@@ -140,16 +130,21 @@ async function fetchHtml(url, options = {}) {
 }
 
 function parseStandingsFromDailyText(text) {
+  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
+  const start = lines.findIndex((line) => line.startsWith('순위 팀명 경기 승 패 무 승률 게임차 최근10경기 연속 홈 방문'));
+  if (start === -1) return [];
   const rows = [];
-  const re = /(?:^|\n)(\d+)\s+([A-Z가-힣]+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+([\d.]+)\s+([\d.]+)\s+([0-9승패무]+)\s+([0-9승패무]+)\s+([0-9-]+)\s+([0-9-]+)(?=\n|$)/g;
-  let m;
-  while ((m = re.exec(text)) !== null) {
-    const [, rank, teamName, games, wins, losses, draws, pct, gb, last10, streak, home, away] = m;
-    const code = getTeam(teamName).code;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (line.startsWith('팀간 승패표')) break;
+    const parts = line.split(/\s+/);
+    if (parts.length < 12) continue;
+    const [rank, teamName, games, wins, losses, draws, pct, gb, last10, streak, home, away] = parts;
+    const team = getTeam(teamName);
     rows.push({
       rank: Number(rank),
-      teamCode: code,
-      teamName: getTeam(code).koShort,
+      teamCode: team.code,
+      teamName: team.koShort,
       games: Number(games),
       wins: Number(wins),
       losses: Number(losses),
@@ -166,12 +161,23 @@ function parseStandingsFromDailyText(text) {
 }
 
 function parsePitcherField(rest, label) {
-  const m = rest.match(new RegExp(`${label}:\s*([^\n]+?)(?=\s+[WSL]:|$)`));
+  const re = new RegExp(`${label}:\\s*([^\\n]+?)(?=\\s+[WSL]:|$)`);
+  const m = rest.match(re);
   return m ? m[1].trim() : null;
 }
 
+function sanitizeScoreboardText(text) {
+  return text
+    .replace(/【\d+†Image:[^\]]+】/g, ' ')
+    .replace(/Image:\s*[A-Za-z0-9_-]+/g, ' ')
+    .replace(/【\d+†[^\]]+】/g, ' ')
+    .replace(/ +/g, ' ')
+    .replace(/\n{2,}/g, '\n')
+    .trim();
+}
+
 function parseScoreboardGames(text, targetDate) {
-  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
+  const lines = sanitizeScoreboardText(text).split('\n').map((line) => line.trim()).filter(Boolean);
   const games = [];
   for (let i = 0; i < lines.length; i += 1) {
     const headline = lines[i];
@@ -179,35 +185,32 @@ function parseScoreboardGames(text, targetDate) {
     const scheduledMatch = headline.match(/^([A-Z]+)\s+(\d{1,2}:\d{2})\s+([A-Z]+)$/);
     if (!finalMatch && !scheduledMatch) continue;
 
+    const venueLine = lines[i + 1] || '';
+    const venueMatch = venueLine.match(/^([A-Z]+)\s+(\d{1,2}:\d{2})(.*)$/);
+    const venue = venueMatch?.[1] || '';
+    const extra = venueMatch?.[3] || '';
+
     if (finalMatch) {
       const [, away, awayScore, homeScore, home] = finalMatch;
-      const infoLine = lines[i + 1] || '';
-      const infoMatch = infoLine.match(/^([A-Z]+)\s+(\d{1,2}:\d{2})(.*)$/);
-      const venue = infoMatch?.[1] || '';
-      const time = infoMatch?.[2] || '';
-      const rest = infoMatch?.[3] || '';
       games.push({
         date: targetDate,
         status: 'final',
         venue,
-        time,
+        time: venueMatch?.[2] || '',
         awayCode: getTeam(away).code,
         homeCode: getTeam(home).code,
         awayTeam: getTeam(away).koShort,
         homeTeam: getTeam(home).koShort,
         awayScore: Number(awayScore),
         homeScore: Number(homeScore),
-        winningPitcher: parsePitcherField(rest, 'W') || null,
-        savePitcher: parsePitcherField(rest, 'S') || null,
-        losingPitcher: parsePitcherField(rest, 'L') || null
+        winningPitcher: parsePitcherField(extra, 'W') || null,
+        savePitcher: parsePitcherField(extra, 'S') || null,
+        losingPitcher: parsePitcherField(extra, 'L') || null
       });
       continue;
     }
 
     const [, away, time, home] = scheduledMatch;
-    const venueLine = lines[i + 1] || '';
-    const venueMatch = venueLine.match(/^([A-Z]+)\s+(\d{1,2}:\d{2})/);
-    const venue = venueMatch?.[1] || venueLine.split(' ')[0] || '';
     games.push({
       date: targetDate,
       status: 'scheduled',
@@ -229,14 +232,12 @@ function parseScoreboardGames(text, targetDate) {
 
 async function fetchDailyStandings() {
   const html = await fetchHtml('https://www.koreabaseball.com/Record/TeamRank/TeamRankDaily.aspx', { decode: 'euc-kr', retries: 1 });
-  const text = htmlToText(html);
-  return parseStandingsFromDailyText(text);
+  return parseStandingsFromDailyText(htmlToText(html));
 }
 
 async function fetchScoreboardForDate(dateString) {
   const html = await fetchHtml(`https://eng.koreabaseball.com/Schedule/Scoreboard.aspx?searchDate=${dateString}`, { decode: 'utf8', retries: 1 });
-  const text = htmlToText(html);
-  return parseScoreboardGames(text, dateString);
+  return parseScoreboardGames(htmlToText(html), dateString);
 }
 
 async function fetchRecentGames(teamCode, limit = 5) {
@@ -250,7 +251,7 @@ async function fetchRecentGames(teamCode, limit = 5) {
     let games = [];
     try {
       games = await fetchScoreboardForDate(dateString);
-    } catch (error) {
+    } catch {
       continue;
     }
     for (const game of games) {
