@@ -1,4 +1,16 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": null
+  "framework": null,
+  "functions": {
+    "api/game-detail.js": {
+      "maxDuration": 30,
+      "memory": 1024
+    },
+    "api/kbo-dashboard.js": {
+      "maxDuration": 15
+    },
+    "api/recent-games.js": {
+      "maxDuration": 20
+    }
+  }
 }

@@ -1,5 +1,14 @@
 {
-  "name": "dugout-note-pixel",
+  "name": "dugout-note-kbo-rebuild",
   "private": true,
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "description": "Mobile-first KBO diary with official standings/scoreboard parsing and GameCenter detail scraping.",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@sparticuz/chromium-min": "^131.0.1",
+    "iconv-lite": "^0.6.3",
+    "playwright-core": "^1.52.0"
+  }
 }

@@ -1,173 +1,136 @@
-const {
-  htmlToLines,
-  fetchHtmlWithTimeout,
-  buildKboGameIds,
-  toCompactDate,
-  normalizeTeam,
-  toKboGameCode
-} = require('./_utils');
+const chromium = require('@sparticuz/chromium-min');
+const { chromium: playwrightChromium } = require('playwright-core');
+const { getTeam, TEAM_META, formatKboDotDate } = require('./_lib/kbo');
 
-const RESULT_TOKENS = new Set(['승', '패', '홀드', '세이브']);
-
-function cleanName(value) {
-  return String(value || '')
-    .replace(/\([^)]*\)/g, '')
-    .replace(/^[\s:,-]+|[\s:,-]+$/g, '')
-    .trim() || null;
-}
-
-function extractNameFromDescription(text = '') {
-  const cleaned = String(text).trim();
-  const match = cleaned.match(/^([A-Za-z가-힣]+)/);
-  return cleanName(match?.[1] || cleaned);
-}
-
-function parseDecisiveHitter(lines = []) {
-  for (let i = 0; i < lines.length; i += 1) {
-    if (lines[i] !== '결승타') continue;
-    const next = lines[i + 1] || lines[i + 2] || '';
-    return extractNameFromDescription(next);
-  }
-  const joined = lines.join(' ');
-  const inline = joined.match(/결승타\s+([^\n]+)/);
-  return inline ? extractNameFromDescription(inline[1]) : null;
-}
-
-function looksLikePitcherRow(tokens) {
-  if (tokens.length < 5) return false;
-  if (!/^[A-Za-z가-힣]+$/.test(tokens[0])) return false;
-  const appearance = tokens[1];
-  return appearance === '선발' || /^\d+(?:\.\d+)?$/.test(appearance);
-}
-
-function parsePitcherRows(lines = []) {
-  const found = {
-    winningPitcher: null,
-    losingPitcher: null,
-    savePitcher: null,
-    holdPitchers: []
-  };
-
-  for (let i = 0; i < lines.length; i += 1) {
-    if (!/투수 기록$/.test(lines[i])) continue;
-    for (let j = i + 1; j < lines.length; j += 1) {
-      const line = lines[j];
-      if (/투수 기록$/.test(line) || /타자 기록$/.test(line) || line === 'TOTAL' || line.startsWith('개인정보 처리방침')) {
-        if (j > i + 1 && (/투수 기록$/.test(line) || /타자 기록$/.test(line))) break;
-        continue;
-      }
-      const tokens = line.split(/\s+/).filter(Boolean);
-      if (!looksLikePitcherRow(tokens)) continue;
-      const name = cleanName(tokens[0]);
-      const maybeResult = tokens[2] && RESULT_TOKENS.has(tokens[2]) ? tokens[2] : null;
-      if (!name || !maybeResult) continue;
-      if (maybeResult === '승' && !found.winningPitcher) found.winningPitcher = name;
-      if (maybeResult === '패' && !found.losingPitcher) found.losingPitcher = name;
-      if (maybeResult === '세이브' && !found.savePitcher) found.savePitcher = name;
-      if (maybeResult === '홀드') found.holdPitchers.push(name);
-    }
-  }
-
-  found.holdPitchers = [...new Set(found.holdPitchers)];
-  return found;
-}
-
-function parseExtrasFromKboText(lines = []) {
-  const pitchers = parsePitcherRows(lines);
-  return {
-    winningPitcher: pitchers.winningPitcher || null,
-    losingPitcher: pitchers.losingPitcher || null,
-    savePitcher: pitchers.savePitcher || null,
-    holdPitchers: pitchers.holdPitchers.length ? pitchers.holdPitchers.join(', ') : null,
-    decisiveHitter: parseDecisiveHitter(lines)
-  };
-}
-
-function hasUsefulDetail(detail) {
-  return Boolean(detail.winningPitcher || detail.losingPitcher || detail.savePitcher || detail.holdPitchers || detail.decisiveHitter);
-}
-
-function extractGameIdsFromScheduleHtml(html = '', dateCompact, away, home) {
-  const candidates = new Set();
-  const regex = /GameCenter\/Main\.aspx\?gameDate=(\d{8})&amp;gameId=([A-Z0-9]+)/g;
-  let match;
-  while ((match = regex.exec(html)) !== null) {
-    const [, gameDate, gameId] = match;
-    if (gameDate !== dateCompact) continue;
-    if (gameId.includes(away) && gameId.includes(home)) candidates.add(gameId);
-  }
-  return [...candidates];
-}
-
-async function gatherCandidateUrls(date, away, home) {
-  const compactDate = toCompactDate(date);
-  const awayCode = toKboGameCode(normalizeTeam(away));
-  const homeCode = toKboGameCode(normalizeTeam(home));
-  const urls = [];
-  const seen = new Set();
-
-  const pushUrl = url => {
-    if (seen.has(url)) return;
-    seen.add(url);
-    urls.push(url);
-  };
-
-  try {
-    const scheduleHtml = await fetchHtmlWithTimeout('https://www.koreabaseball.com/Schedule/Schedule.aspx', 6000);
-    extractGameIdsFromScheduleHtml(scheduleHtml, compactDate, awayCode, homeCode).forEach(gameId => {
-      pushUrl(`https://www.koreabaseball.com/Schedule/GameCenter/Main.aspx?gameDate=${compactDate}&gameId=${gameId}`);
-    });
-  } catch (_error) {
-    // ignore schedule lookup failure
-  }
-
-  buildKboGameIds(date, away, home).forEach(gameId => {
-    pushUrl(`https://www.koreabaseball.com/Schedule/GameCenter/Main.aspx?gameDate=${compactDate}&gameId=${gameId}`);
+async function launchBrowser() {
+  const executablePath = await chromium.executablePath();
+  return playwrightChromium.launch({
+    args: chromium.args,
+    executablePath,
+    headless: true
   });
-
-  pushUrl(`https://www.koreabaseball.com/Schedule/GameCenter/Main.aspx?gameDate=${compactDate}`);
-  return urls;
 }
 
-async function tryFetchOfficialDetail(date, away, home) {
-  const urls = await gatherCandidateUrls(date, away, home);
+function normalize(text) {
+  return String(text || '').replace(/\s+/g, ' ').trim();
+}
 
-  for (const url of urls) {
-    try {
-      const html = await fetchHtmlWithTimeout(url, 6000);
-      const detail = parseExtrasFromKboText(htmlToLines(html));
-      if (hasUsefulDetail(detail)) return { ...detail, sourceUrl: url };
-    } catch (_error) {
-      // try next candidate
+async function setTargetDate(page, targetLabel) {
+  for (let step = 0; step < 14; step += 1) {
+    const heading = normalize(await page.locator('text=/\d{4}\.\d{2}\.\d{2}\([^)]+\)/').first().textContent().catch(() => ''));
+    if (heading.includes(targetLabel)) return;
+    const current = heading.match(/(\d{4})\.(\d{2})\.(\d{2})/);
+    const target = targetLabel.match(/(\d{4})\.(\d{2})\.(\d{2})/);
+    if (!current || !target) break;
+    const currentKey = `${current[1]}${current[2]}${current[3]}`;
+    const targetKey = `${target[1]}${target[2]}${target[3]}`;
+    const buttonIndex = currentKey > targetKey ? 0 : 1;
+    await page.locator('button, a').filter({ hasText: /./ }).nth(buttonIndex).click({ force: true }).catch(() => null);
+    await page.waitForTimeout(600);
+  }
+}
+
+async function clickGameCard(page, awayKo, homeKo) {
+  const cardCandidates = page.locator('div, li, a, button').filter({ hasText: awayKo }).filter({ hasText: homeKo });
+  const count = await cardCandidates.count().catch(() => 0);
+  for (let i = 0; i < count; i += 1) {
+    const card = cardCandidates.nth(i);
+    const text = normalize(await card.textContent().catch(() => ''));
+    if (text.includes(awayKo) && text.includes(homeKo)) {
+      await card.click({ force: true }).catch(() => null);
+      await page.waitForTimeout(700);
+      return true;
     }
   }
+  return false;
+}
 
-  return {
-    winningPitcher: null,
-    losingPitcher: null,
-    savePitcher: null,
-    holdPitchers: null,
-    decisiveHitter: null,
-    sourceUrl: null
-  };
+async function clickReviewTab(page) {
+  await page.locator('text=리뷰').first().click({ force: true }).catch(() => null);
+  await page.waitForTimeout(700);
+}
+
+async function extractWinningHit(page) {
+  const row = page.locator('tr').filter({ hasText: '결승타' }).first();
+  const text = normalize(await row.textContent().catch(() => ''));
+  if (!text) return null;
+  return text.replace(/^결승타\s*/, '').trim() || null;
+}
+
+async function extractPitchersFromTable(table) {
+  const rows = await table.locator('tr').all();
+  const detail = { win: [], loss: [], save: [], hold: [] };
+  for (const row of rows) {
+    const text = normalize(await row.textContent().catch(() => ''));
+    if (!text || text.includes('선수명') || text.includes('TOTAL')) continue;
+    const cols = text.split(' ');
+    const name = cols[0] || '';
+    if (/\b승\b/.test(text) || text.includes(' 승 ')) detail.win.push(name);
+    if (/\b패\b/.test(text) || text.includes(' 패 ')) detail.loss.push(name);
+    if (text.includes('세이브')) detail.save.push(name);
+    if (text.includes('홀드')) detail.hold.push(name);
+  }
+  return detail;
 }
 
 module.exports = async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-
   const date = String(req.query.date || '').trim();
-  const away = normalizeTeam(req.query.away || '');
-  const home = normalizeTeam(req.query.home || '');
+  const away = getTeam(req.query.away || 'LOTTE');
+  const home = getTeam(req.query.home || 'NC');
 
-  if (!date || !away || !home) {
-    return res.status(200).json({ winningPitcher: null, losingPitcher: null, savePitcher: null, holdPitchers: null, decisiveHitter: null, sourceUrl: null });
+  const payload = {
+    source: 'kbo-gamecenter-review',
+    date,
+    away: away.code,
+    home: home.code,
+    winningHit: null,
+    winningPitcher: null,
+    losingPitcher: null,
+    savePitcher: null,
+    holdPitchers: [],
+    note: null,
+    error: null
+  };
+
+  let browser;
+  try {
+    browser = await launchBrowser();
+    const page = await browser.newPage({ locale: 'ko-KR' });
+    await page.goto('https://www.koreabaseball.com/Schedule/GameCenter/Main.aspx', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForTimeout(1500);
+
+    const targetLabel = formatKboDotDate(new Date(date));
+    await setTargetDate(page, targetLabel);
+    const clicked = await clickGameCard(page, away.koShort, home.koShort);
+    if (!clicked) throw new Error('경기 카드를 찾지 못했어요.');
+
+    await clickReviewTab(page);
+
+    payload.winningHit = await extractWinningHit(page);
+
+    const awayTable = page.locator(`text=${away.koFull} 투수 기록`).locator('..').locator('xpath=following-sibling::*[1]').first();
+    const homeTable = page.locator(`text=${home.koFull} 투수 기록`).locator('..').locator('xpath=following-sibling::*[1]').first();
+
+    const awayDetail = await extractPitchersFromTable(awayTable).catch(() => ({ win: [], loss: [], save: [], hold: [] }));
+    const homeDetail = await extractPitchersFromTable(homeTable).catch(() => ({ win: [], loss: [], save: [], hold: [] }));
+    const merged = {
+      win: [...awayDetail.win, ...homeDetail.win],
+      loss: [...awayDetail.loss, ...homeDetail.loss],
+      save: [...awayDetail.save, ...homeDetail.save],
+      hold: [...awayDetail.hold, ...homeDetail.hold]
+    };
+
+    payload.winningPitcher = merged.win[0] || null;
+    payload.losingPitcher = merged.loss[0] || null;
+    payload.savePitcher = merged.save[0] || null;
+    payload.holdPitchers = merged.hold;
+    payload.note = '리뷰 탭과 양팀 투수 기록 표 기준으로 읽어요.';
+  } catch (error) {
+    payload.error = error.message;
+  } finally {
+    if (browser) await browser.close().catch(() => null);
   }
 
-  const detail = await tryFetchOfficialDetail(date, away, home);
-  return res.status(200).json(detail);
+  res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=1200');
+  res.status(200).json(payload);
 };
